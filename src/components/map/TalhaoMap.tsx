@@ -3,6 +3,7 @@
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { Talhao } from "../../hooks/useTalhoes";
+import { useToast } from "../ui/Toast";
 
 export interface TempPolygon {
   boundary: [number, number][];
@@ -33,6 +34,7 @@ export function TalhaoMap({
   const [addingArmadilha, setAddingArmadilha] = useState(false);
   const armadilhaLayersRef = useRef<Map<number, any[]>>(new Map());
   const [armadilhaCountsByTalhao, setArmadilhaCountsByTalhao] = useState<Map<number, number>>(new Map());
+  const toast = useToast();
 
   // 1. Carrega scripts Leaflet
   useEffect(() => {
@@ -209,6 +211,15 @@ export function TalhaoMap({
         console.warn('Erro ao detectar talhão:', err);
       }
 
+      if (!foundTalhaoId) {
+        toast.warning(
+          "Fora do talhão",
+          "A armadilha precisa estar dentro de um talhão. Clique dentro de um talhão para adicionar."
+        );
+        setAddingArmadilha(false);
+        return;
+      }
+
       if (typeof onAddArmadilha === 'function') {
         onAddArmadilha(lat, lng, foundTalhaoId);
       }
@@ -227,7 +238,7 @@ export function TalhaoMap({
         map.off('click', onMapClick);
       } catch (e) {}
     };
-  }, [mapInitialized, addingArmadilha, talhoes, onAddArmadilha]);
+  }, [mapInitialized, addingArmadilha, talhoes, onAddArmadilha, toast]);
 
   const fetchAndRenderArmadilhasForTalhao = useCallback(async (talhaoId: number) => {
     if (!mapInstanceRef.current) return 0;
@@ -457,16 +468,16 @@ export function TalhaoMap({
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", height: "100%", position: "relative" }}>
 
-      {/* Barra de controles flutuante sobre o mapa */}
+      {/* ── Barra de controles — canto DIREITO para não sobrepor Leaflet Draw ── */}
       <div style={{
         position: "absolute",
         top: "1rem",
-        left: "1rem",
+        right: "1rem",          // ← movido para a direita
         zIndex: 1000,
         display: "flex",
+        flexDirection: "column",
         gap: "0.5rem",
-        alignItems: "center",
-        flexWrap: "wrap",
+        alignItems: "flex-end", // ← alinha à direita
       }}>
         <button
           onClick={() => setDrawing(!drawing)}
@@ -483,6 +494,7 @@ export function TalhaoMap({
             backdropFilter: "blur(8px)",
             boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
             fontSize: "0.875rem",
+            whiteSpace: "nowrap",
           }}
         >
           {!mapInitialized ? "⏳ Carregando..." : drawing ? "❌ Cancelar desenho" : "✏️ Novo talhão"}
@@ -503,6 +515,7 @@ export function TalhaoMap({
             backdropFilter: "blur(8px)",
             boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
             fontSize: "0.875rem",
+            whiteSpace: "nowrap",
           }}
         >
           {!mapInitialized ? "⏳" : addingArmadilha ? "❌ Cancelar" : "📸 Adicionar ponto de foto"}
@@ -518,6 +531,7 @@ export function TalhaoMap({
             fontSize: "0.875rem",
             backdropFilter: "blur(8px)",
             boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
+            whiteSpace: "nowrap",
           }}>
             ☕ {talhoes.length} talhão(ões)
           </span>

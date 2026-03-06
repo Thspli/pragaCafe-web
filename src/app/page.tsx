@@ -12,10 +12,12 @@ import { ListaArmadilhasModal } from "../components/modals/ListaArmadilhasModal"
 import { TutorialTalhao } from "../components/tutorial/TutorialTalhao";
 import { TalhaoPanel } from "../components/panels/TalhaoPanel";
 import { ArmadilhaPanel } from "../components/panels/ArmadilhaPanel";
+import { useToast } from "../components/ui/Toast";
 
 export default function Page() {
   const { talhoes, loading, error, getTotals, createTalhao } = useTalhoes();
   const totals = getTotals();
+  const toast = useToast();
 
   const [tempPolygon, setTempPolygon] = useState<TempPolygon | null>(null);
   const [showNewTalhaoModal, setShowNewTalhaoModal] = useState(false);
@@ -80,7 +82,10 @@ export default function Page() {
 
   const handleAddArmadilha = async (lat: number, lng: number, talhaoId?: number | null) => {
     if (!talhaoId) {
-      alert('⚠️ A armadilha precisa estar dentro de um talhão. Clique dentro de um talhão para adicionar.');
+      toast.warning(
+        "Fora do talhão",
+        "A armadilha precisa estar dentro de um talhão. Clique dentro de um talhão para adicionar."
+      );
       return;
     }
     setPendingArmadilha({ lat, lng, talhaoId });
@@ -103,12 +108,12 @@ export default function Page() {
         await fetchRealArmadilhaCount(data.talhaoId);
       }
       await fetchTotalArmadilhas();
-      alert('✅ Armadilha salva com sucesso!');
+      toast.success("Armadilha salva!", "O ponto de foto foi registrado com sucesso.");
       setArmadilhaModalOpen(false);
       setPendingArmadilha(null);
     } catch (err) {
       console.error('❌ Erro ao salvar armadilha:', err);
-      alert('❌ Erro ao criar/atualizar armadilha. Verifique o console.');
+      toast.error("Erro ao salvar", "Não foi possível criar/atualizar a armadilha. Verifique o console.");
     }
   };
 
@@ -145,7 +150,10 @@ export default function Page() {
   };
 
   const handleConfirmNovoTalhao = async () => {
-    if (!tempPolygon || !newTalhaoNome.trim()) { alert("⚠️ Nome é obrigatório"); return; }
+    if (!tempPolygon || !newTalhaoNome.trim()) {
+      toast.warning("Campo obrigatório", "O nome do talhão é obrigatório.");
+      return;
+    }
     try {
       await createTalhao({
         nome: newTalhaoNome, area: tempPolygon.area, status: newTalhaoStatus,
@@ -155,9 +163,10 @@ export default function Page() {
       setTempPolygon(null);
       setNewTalhaoNome("");
       setNewTalhaoStatus("baixo");
+      toast.success("Talhão criado!", "O talhão foi salvo e já aparece no mapa.");
       window.location.reload();
     } catch (err) {
-      alert("❌ Erro ao salvar talhão. Verifique o backend.");
+      toast.error("Erro ao salvar talhão", "Verifique se o backend está rodando e tente novamente.");
     }
   };
 
@@ -190,7 +199,6 @@ export default function Page() {
         </div>
       )}
 
-      {/* Header fixo no topo */}
       <Header
         totals={{ ...totals, totalArmadilhas: totalArmadilhasGlobal }}
         onNovoTalhao={() => {}}
@@ -200,7 +208,6 @@ export default function Page() {
         onCreateTestTalhao={() => {}}
       />
 
-      {/* Mapa ocupa todo o espaço restante */}
       <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
         <TalhaoMap
           talhoes={talhoes}
@@ -211,7 +218,6 @@ export default function Page() {
         />
       </div>
 
-      {/* Modals e Panels (todos position: fixed) */}
       <NovoTalhaoModal
         open={showNewTalhaoModal}
         onClose={() => setShowNewTalhaoModal(false)}

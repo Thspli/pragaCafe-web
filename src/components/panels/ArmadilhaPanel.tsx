@@ -4,6 +4,7 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, MapPin, Calendar, Camera, AlertCircle, CheckCircle, Edit, Trash2, Save, XCircle, Clock, Navigation } from "lucide-react";
+import { useToast } from "../ui/Toast";
 
 interface ArmadilhaPanelProps {
   armadilha: any | null;
@@ -19,6 +20,7 @@ export function ArmadilhaPanel({ armadilha, onClose }: ArmadilhaPanelProps) {
     ausencia: armadilha?.ausencia || false,
   });
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const toast = useToast();
 
   React.useEffect(() => {
     if (armadilha) {
@@ -42,18 +44,24 @@ export function ArmadilhaPanel({ armadilha, onClose }: ArmadilhaPanelProps) {
         body: JSON.stringify({ nome: editedData.nome, observacao: editedData.observacao, ausencia: editedData.ausencia }),
       });
       if (!response.ok) throw new Error("Erro ao atualizar ponto de foto");
-      alert("✅ Ponto de foto atualizado com sucesso!");
+      toast.success("Ponto de foto atualizado!", "As alterações foram salvas com sucesso.");
       setIsEditing(false);
       window.dispatchEvent(new CustomEvent('armadilha:changed', { detail: { action: 'updated', armadilha: { ...armadilha, ...editedData } } }));
       window.location.reload();
     } catch (error) {
-      alert("❌ Erro ao atualizar ponto de foto. Verifique o backend.");
+      toast.error("Erro ao atualizar", "Não foi possível salvar as alterações. Verifique o backend.");
     }
   };
 
   const handleDelete = async () => {
-    const confirmacao = window.confirm(`⚠️ ATENÇÃO!\n\nTem certeza que deseja excluir o ponto de foto "${armadilha.nome}"?\n\nEsta ação não pode ser desfeita!`);
-    if (!confirmacao) return;
+    const confirmed = await toast.confirm({
+      title: `Excluir "${armadilha.nome || 'Ponto de Foto'}"?`,
+      message: "Esta ação não pode ser desfeita. O ponto de foto será removido permanentemente.",
+      confirmLabel: "Sim, excluir",
+      cancelLabel: "Cancelar",
+      danger: true,
+    });
+    if (!confirmed) return;
     try {
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3333';
       const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
@@ -62,12 +70,12 @@ export function ArmadilhaPanel({ armadilha, onClose }: ArmadilhaPanelProps) {
         headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) }
       });
       if (!response.ok) throw new Error("Erro ao deletar ponto de foto");
-      alert("✅ Ponto de foto excluído com sucesso!");
+      toast.success("Ponto de foto excluído", "O ponto de foto foi removido com sucesso.");
       onClose();
       window.dispatchEvent(new CustomEvent('armadilha:changed', { detail: { action: 'deleted', armadilha } }));
       window.location.reload();
     } catch (error) {
-      alert("❌ Erro ao excluir ponto de foto. Verifique o backend.");
+      toast.error("Erro ao excluir", "Não foi possível excluir o ponto de foto. Verifique o backend.");
     }
   };
 

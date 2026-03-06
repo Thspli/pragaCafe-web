@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
+import { useToast } from "../ui/Toast";
 
 interface NovoArmadilhaModalProps {
   open: boolean;
@@ -34,6 +35,7 @@ export function NovoArmadilhaModal({ open, onClose, lat, lng, talhaoId, talhaoNo
   const [existingId, setExistingId] = useState<number | null>(null);
   const [photosLoading, setPhotosLoading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const toast = useToast();
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3333';
 
@@ -96,7 +98,10 @@ export function NovoArmadilhaModal({ open, onClose, lat, lng, talhaoId, talhaoNo
   }, [open, talhaoId, lat, lng, API_URL]);
 
   const handleSubmit = async () => {
-    if (!nome.trim()) { alert('⚠️ Nome obrigatório'); return; }
+    if (!nome.trim()) {
+      toast.warning("Campo obrigatório", "O nome do ponto de foto é obrigatório.");
+      return;
+    }
     setLoading(true);
     try {
       const payload: any = {
@@ -107,7 +112,7 @@ export function NovoArmadilhaModal({ open, onClose, lat, lng, talhaoId, talhaoNo
       await onConfirm(payload);
       onClose();
     } catch (err) {
-      alert('❌ Erro ao salvar ponto de foto. Verifique o console.');
+      toast.error("Erro ao salvar", "Não foi possível salvar o ponto de foto. Verifique o console.");
     } finally {
       setLoading(false);
     }
