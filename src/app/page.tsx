@@ -32,7 +32,7 @@ export default function Page() {
 
   const [armadilhaModalOpen, setArmadilhaModalOpen] = useState(false);
   const [pendingArmadilha, setPendingArmadilha] = useState<{ lat: number; lng: number; talhaoId?: number | null } | null>(null);
-  
+
   const [armadilhaRealCount, setArmadilhaRealCount] = useState<number | null>(null);
   const [totalArmadilhasGlobal, setTotalArmadilhasGlobal] = useState<number>(0);
 
@@ -164,7 +164,7 @@ export default function Page() {
   if (loading) {
     return (
       <div style={{
-        minHeight: "100vh", background: "#fdf6f0", display: "flex",
+        height: "100vh", background: "#fdf6f0", display: "flex",
         alignItems: "center", justifyContent: "center", flexDirection: "column", gap: "1rem",
       }}>
         <div style={{
@@ -178,7 +178,8 @@ export default function Page() {
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: "#fdf6f0" }}>
+    <div style={{ height: "100vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+
       {error && (
         <div style={{
           position: "fixed", top: "20px", right: "20px", background: "#fef3c7", color: "#92400e",
@@ -189,6 +190,7 @@ export default function Page() {
         </div>
       )}
 
+      {/* Header fixo no topo */}
       <Header
         totals={{ ...totals, totalArmadilhas: totalArmadilhasGlobal }}
         onNovoTalhao={() => {}}
@@ -198,14 +200,18 @@ export default function Page() {
         onCreateTestTalhao={() => {}}
       />
 
-      <TalhaoMap
-        talhoes={talhoes}
-        onPolygonCreated={handlePolygonCreated}
-        onTalhaoClick={handleTalhaoClick}
-        onArmadilhaClick={(a) => setArmadilhaSelecionada(a)}
-        onAddArmadilha={handleAddArmadilha}
-      />
+      {/* Mapa ocupa todo o espaço restante */}
+      <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+        <TalhaoMap
+          talhoes={talhoes}
+          onPolygonCreated={handlePolygonCreated}
+          onTalhaoClick={handleTalhaoClick}
+          onArmadilhaClick={(a) => setArmadilhaSelecionada(a)}
+          onAddArmadilha={handleAddArmadilha}
+        />
+      </div>
 
+      {/* Modals e Panels (todos position: fixed) */}
       <NovoTalhaoModal
         open={showNewTalhaoModal}
         onClose={() => setShowNewTalhaoModal(false)}
@@ -247,7 +253,7 @@ export default function Page() {
         armadilhaRealCount={armadilhaRealCount}
         onClose={() => { setTalhaoSelecionado(null); setArmadilhaRealCount(null); }}
       />
-      
+
       <ArmadilhaPanel armadilha={armadilhaSelecionada} onClose={() => setArmadilhaSelecionada(null)} />
 
       <TutorialTalhao

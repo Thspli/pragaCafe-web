@@ -1,5 +1,4 @@
 // src/components/map/TalhaoMap.tsx
-// MUDANÇAS: cana → café, verde → marrom/caramelo
 "use client";
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
@@ -63,7 +62,6 @@ export function TalhaoMap({
       const drawJs = document.createElement("script");
       drawJs.src = "https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js";
       drawJs.onload = () => {
-        console.log("✅ Scripts carregados");
         setScriptsLoaded(true);
       };
       document.body.appendChild(drawJs);
@@ -76,10 +74,10 @@ export function TalhaoMap({
       style.id = 'armadilha-marker-styles';
       style.innerHTML = `
         .armadilha-bounce { animation: armadilha-pop 600ms cubic-bezier(.2,.8,.2,1); transform-origin: center bottom; }
-        @keyframes armadilha-pop { 
-          0% { transform: scale(0) translateY(20px); opacity: 0 } 
-          60% { transform: scale(1.15) translateY(-5px); opacity: 1 } 
-          100% { transform: scale(1) translateY(0); opacity: 1 } 
+        @keyframes armadilha-pop {
+          0% { transform: scale(0) translateY(20px); opacity: 0 }
+          60% { transform: scale(1.15) translateY(-5px); opacity: 1 }
+          100% { transform: scale(1) translateY(0); opacity: 1 }
         }
         .armadilha-marker-container {
           filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));
@@ -101,16 +99,9 @@ export function TalhaoMap({
 
   // 2. Inicializa mapa
   useEffect(() => {
-    if (!scriptsLoaded || !mapContainerRef.current || mapInstanceRef.current) {
-      return;
-    }
+    if (!scriptsLoaded || !mapContainerRef.current || mapInstanceRef.current) return;
 
     const L = (window as any).L;
-    console.log("🗺️ Inicializando mapa...");
-
-    if (mapInstanceRef.current?.map) {
-      mapInstanceRef.current.map.remove();
-    }
 
     const map = L.map(mapContainerRef.current, {
       center: [-22.028, -50.044],
@@ -125,22 +116,15 @@ export function TalhaoMap({
 
     const drawnItems = L.featureGroup().addTo(map);
 
-    mapInstanceRef.current = {
-      map,
-      drawnItems,
-      layers: [],
-    };
+    mapInstanceRef.current = { map, drawnItems, layers: [] };
 
     setTimeout(() => {
       map.invalidateSize();
       setMapInitialized(true);
-      console.log("✅ Mapa inicializado!");
     }, 500);
 
     return () => {
-      if (map) {
-        map.remove();
-      }
+      if (map) map.remove();
     };
   }, [scriptsLoaded]);
 
@@ -161,11 +145,7 @@ export function TalhaoMap({
         marker: false,
         circlemarker: false,
       },
-      edit: {
-        featureGroup: drawnItems,
-        edit: false,
-        remove: false,
-      },
+      edit: { featureGroup: drawnItems, edit: false, remove: false },
     });
 
     map.addControl(drawControl);
@@ -251,7 +231,7 @@ export function TalhaoMap({
 
   const fetchAndRenderArmadilhasForTalhao = useCallback(async (talhaoId: number) => {
     if (!mapInstanceRef.current) return 0;
-    
+
     const { map } = mapInstanceRef.current;
     const L = (window as any).L;
 
@@ -260,14 +240,12 @@ export function TalhaoMap({
       const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
 
       const oldLayers = armadilhaLayersRef.current.get(talhaoId) || [];
-      oldLayers.forEach((layer) => {
-        try { map.removeLayer(layer); } catch (e) {}
-      });
+      oldLayers.forEach((layer) => { try { map.removeLayer(layer); } catch (e) {} });
       armadilhaLayersRef.current.set(talhaoId, []);
 
       const params = new URLSearchParams();
       params.set('talhaoId', String(talhaoId));
-      
+
       const res = await fetch(`${API_URL}/armadilhas?${params.toString()}`, {
         headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) }
       });
@@ -275,25 +253,20 @@ export function TalhaoMap({
       if (!res.ok) return 0;
 
       const armadilhas = await res.json();
-      
-      const uniqueArmadilhas = Array.from(
-        new Map(armadilhas.map((a: any) => [a.id, a])).values()
-      );
-
+      const uniqueArmadilhas = Array.from(new Map(armadilhas.map((a: any) => [a.id, a])).values());
       const newLayers: any[] = [];
 
       uniqueArmadilhas.forEach((a: any) => {
         if (a.latitude == null || a.longitude == null) return;
 
         const isAusencia = a.ausencia || false;
-        
-        // Ícone com cores café
+
         const svg = `
           <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg" class="armadilha-marker-container">
             <ellipse cx="16" cy="37" rx="8" ry="2" fill="rgba(0,0,0,0.2)"/>
-            <path d="M16 2C10.477 2 6 6.477 6 12C6 18.5 16 36 16 36C16 36 26 18.5 26 12C26 6.477 21.523 2 16 2Z" 
-                  fill="${isAusencia ? '#94a3b8' : '#C8860A'}" 
-                  stroke="#ffffff" 
+            <path d="M16 2C10.477 2 6 6.477 6 12C6 18.5 16 36 16 36C16 36 26 18.5 26 12C26 6.477 21.523 2 16 2Z"
+                  fill="${isAusencia ? '#94a3b8' : '#C8860A'}"
+                  stroke="#ffffff"
                   stroke-width="2"/>
             ${isAusencia ? `
               <line x1="12" y1="10" x2="20" y2="18" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round"/>
@@ -305,7 +278,7 @@ export function TalhaoMap({
             `}
           </svg>
         `;
-        
+
         const aIcon = L.divIcon({
           html: svg,
           className: 'armadilha-icon',
@@ -329,15 +302,11 @@ export function TalhaoMap({
             </div>
           </div>
         `;
-        
+
         amarker.bindPopup(popupHtml);
 
         if (typeof onArmadilhaClick === 'function') {
-          try {
-            amarker.on('click', () => onArmadilhaClick(a));
-          } catch (e) {
-            try { (amarker as any).openPopup(); } catch (err) {}
-          }
+          try { amarker.on('click', () => onArmadilhaClick(a)); } catch (e) {}
         }
 
         try {
@@ -361,28 +330,24 @@ export function TalhaoMap({
   useEffect(() => {
     if (!mapInitialized || !mapInstanceRef.current) return;
 
-    console.log("🎨 RENDERIZANDO", talhoes.length, "TALHÕES");
-
     const L = (window as any).L;
     const { map, layers } = mapInstanceRef.current;
 
-    layers.forEach((layer: any) => {
-      try { map.removeLayer(layer); } catch (e) {}
-    });
+    layers.forEach((layer: any) => { try { map.removeLayer(layer); } catch (e) {} });
     mapInstanceRef.current.layers = [];
 
     if (!talhoes.length) return;
 
     (async () => {
       const newCounts = new Map<number, number>();
-      
+
       for (const talhao of talhoes) {
         const count = await fetchAndRenderArmadilhasForTalhao(talhao.id);
         newCounts.set(talhao.id, count);
       }
-      
+
       setArmadilhaCountsByTalhao(newCounts);
-      
+
       talhoes.forEach((talhao) => {
         if (!talhao.boundary?.length || !talhao.center) return;
 
@@ -402,7 +367,6 @@ export function TalhaoMap({
 
         mapInstanceRef.current.layers.push(polygon);
 
-        // Label com cores café
         const labelHtml = `
           <div style="border:2px solid ${color};background:rgba(255,255,255,0.95);padding:6px 10px;border-radius:6px;font-size:11px;font-weight:600;text-align:center;box-shadow:0 2px 4px rgba(0,0,0,0.12);white-space:nowrap;">
             <div style="color:#2C1810;font-weight:700;">${talhao.nome}</div>
@@ -420,11 +384,7 @@ export function TalhaoMap({
           iconAnchor: [60, 22],
         });
 
-        const marker = L.marker(talhao.center, {
-          icon: labelIcon,
-          interactive: false,
-        }).addTo(map);
-
+        const marker = L.marker(talhao.center, { icon: labelIcon, interactive: false }).addTo(map);
         mapInstanceRef.current.layers.push(marker);
       });
 
@@ -437,11 +397,7 @@ export function TalhaoMap({
       })();
 
       if (hasValidCenter) {
-        try {
-          map.setView(ultimo.center, 17, { animate: true });
-        } catch (e) {
-          console.warn('Não foi possível centralizar no talhão:', e);
-        }
+        try { map.setView(ultimo.center, 17, { animate: true }); } catch (e) {}
       }
     })();
 
@@ -490,112 +446,111 @@ export function TalhaoMap({
 
   const getStatusColor = (status: string | null): string => {
     switch (status) {
-      case "baixo": return "#8B4513";   // café claro
-      case "medio": return "#C8860A";   // caramelo
-      case "alto":  return "#D4A853";   // dourado
-      case "critico": return "#dc2626"; // vermelho crítico
-      default: return "#6b7280";
+      case "baixo":   return "#8B4513";
+      case "medio":   return "#C8860A";
+      case "alto":    return "#D4A853";
+      case "critico": return "#dc2626";
+      default:        return "#6b7280";
     }
   };
 
   return (
-    <div style={{ padding: "1.5rem", paddingTop: "1rem" }}>
-      <div style={{ marginBottom: "0.75rem", display: "flex", alignItems: "center", gap: "1rem" }}>
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", height: "100%", position: "relative" }}>
+
+      {/* Barra de controles flutuante sobre o mapa */}
+      <div style={{
+        position: "absolute",
+        top: "1rem",
+        left: "1rem",
+        zIndex: 1000,
+        display: "flex",
+        gap: "0.5rem",
+        alignItems: "center",
+        flexWrap: "wrap",
+      }}>
         <button
           onClick={() => setDrawing(!drawing)}
           disabled={!mapInitialized}
           style={{
-            background: !mapInitialized ? "#94a3b8" : drawing ? "#dc2626" : "#8B4513",
+            background: !mapInitialized ? "rgba(148,163,184,0.9)" : drawing ? "rgba(220,38,38,0.9)" : "rgba(139,69,19,0.9)",
             color: "white",
             fontWeight: 600,
             padding: "0.5rem 1rem",
             borderRadius: "0.5rem",
             border: "none",
             cursor: mapInitialized ? "pointer" : "not-allowed",
-            opacity: mapInitialized ? 1 : 0.6,
+            opacity: mapInitialized ? 1 : 0.7,
+            backdropFilter: "blur(8px)",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
+            fontSize: "0.875rem",
           }}
         >
-          {!mapInitialized
-            ? "⏳ Carregando..."
-            : drawing
-            ? "❌ Cancelar desenho"
-            : "✏️ Novo talhão (desenhar)"}
+          {!mapInitialized ? "⏳ Carregando..." : drawing ? "❌ Cancelar desenho" : "✏️ Novo talhão"}
         </button>
+
         <button
           onClick={() => setAddingArmadilha(!addingArmadilha)}
           disabled={!mapInitialized}
           style={{
-            background: !mapInitialized ? "#94a3b8" : addingArmadilha ? "#ef4444" : "#C8860A",
+            background: !mapInitialized ? "rgba(148,163,184,0.9)" : addingArmadilha ? "rgba(239,68,68,0.9)" : "rgba(200,134,10,0.9)",
             color: "white",
             fontWeight: 600,
             padding: "0.5rem 1rem",
             borderRadius: "0.5rem",
             border: "none",
             cursor: mapInitialized ? "pointer" : "not-allowed",
-            opacity: mapInitialized ? 1 : 0.6,
+            opacity: mapInitialized ? 1 : 0.7,
+            backdropFilter: "blur(8px)",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
+            fontSize: "0.875rem",
           }}
         >
-          {!mapInitialized
-            ? "⏳"
-            : addingArmadilha
-            ? "❌ Cancelar"
-            : "📸 Adicionar ponto de foto"}
+          {!mapInitialized ? "⏳" : addingArmadilha ? "❌ Cancelar" : "📸 Adicionar ponto de foto"}
         </button>
-        
+
         {mapInitialized && talhoes.length > 0 && (
-          <span style={{ color: "#4A2C2A", fontWeight: 600 }}>
-            ☕ {talhoes.length} talhão(ões) no mapa
+          <span style={{
+            background: "rgba(44,24,16,0.85)",
+            color: "#D4A853",
+            fontWeight: 600,
+            padding: "0.5rem 0.875rem",
+            borderRadius: "0.5rem",
+            fontSize: "0.875rem",
+            backdropFilter: "blur(8px)",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
+          }}>
+            ☕ {talhoes.length} talhão(ões)
           </span>
         )}
       </div>
 
+      {/* Container do mapa — ocupa todo o espaço */}
       <div
         ref={mapContainerRef}
         style={{
+          flex: 1,
           width: "100%",
-          height: "520px",
-          border: "2px solid #8B4513",
-          borderRadius: "0.75rem",
-          overflow: "hidden",
+          height: "100%",
           background: "#d4d4d4",
           position: "relative",
         }}
       >
         {!mapInitialized && (
-          <div
-            style={{
-              position: "absolute",
-              top: "50%",
-              left: "50%",
-              transform: "translate(-50%, -50%)",
-              zIndex: 1000,
-              background: "white",
-              padding: "1.5rem 2rem",
-              borderRadius: "0.75rem",
-              boxShadow: "0 8px 16px rgba(0,0,0,0.2)",
-              textAlign: "center",
-            }}
-          >
-            <div
-              style={{
-                width: "40px",
-                height: "40px",
-                border: "4px solid #e2e8f0",
-                borderTop: "4px solid #8B4513",
-                borderRadius: "50%",
-                margin: "0 auto 1rem",
-                animation: "spin 1s linear infinite",
-              }}
-            />
+          <div style={{
+            position: "absolute", top: "50%", left: "50%",
+            transform: "translate(-50%, -50%)", zIndex: 1000,
+            background: "white", padding: "1.5rem 2rem",
+            borderRadius: "0.75rem", boxShadow: "0 8px 16px rgba(0,0,0,0.2)", textAlign: "center",
+          }}>
+            <div style={{
+              width: "40px", height: "40px", border: "4px solid #e2e8f0",
+              borderTop: "4px solid #8B4513", borderRadius: "50%",
+              margin: "0 auto 1rem", animation: "spin 1s linear infinite",
+            }} />
             <p style={{ color: "#4A2C2A", fontWeight: 600, margin: 0 }}>
               🛰️ Carregando mapa satélite...
             </p>
-            <style>{`
-              @keyframes spin {
-                0% { transform: rotate(0deg); }
-                100% { transform: rotate(360deg); }
-              }
-            `}</style>
+            <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
           </div>
         )}
       </div>
