@@ -1,8 +1,12 @@
 // src/components/panels/Header.tsx
 "use client";
 
-import React, { useState } from "react";
-import { Coffee, MapPin, Camera, TrendingUp, BarChart3, User, LogOut, Settings, Bell, ChevronDown } from "lucide-react";
+import React, { useState, useRef, useEffect } from "react";
+import {
+  Coffee, MapPin, Camera, TrendingUp, BarChart3,
+  User, LogOut, Settings, Bell, ChevronDown, X,
+  Leaf, Map
+} from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
@@ -21,491 +25,524 @@ interface HeaderProps {
   onCreateTestTalhao: () => void;
 }
 
+const notifications = [
+  { id: 1, type: "warning", message: "Talhão 3 com infestação alta", time: "5 min" },
+  { id: 2, type: "success", message: "Novo ponto de foto cadastrado", time: "1h" },
+  { id: 3, type: "info",    message: "Relatório mensal disponível",   time: "3h" },
+];
+
 export function Header({
   totals,
-  onNovoTalhao,
   onListaTalhoes,
   onListaArmadilhas,
-  onMinhaLocalizacao,
-  onCreateTestTalhao,
 }: HeaderProps) {
   const { user, logout } = useAuth();
   const router = useRouter();
-  const [showUserMenu, setShowUserMenu] = useState(false);
-  const [showNotifications, setShowNotifications] = useState(false);
 
-  const notifications = [
-    { id: 1, type: 'warning', message: 'Talhão 3 com infestação alta', time: '5 min' },
-    { id: 2, type: 'success', message: 'Nova ponto de foto cadastrado', time: '1h' },
-    { id: 3, type: 'info', message: 'Relatório mensal disponível', time: '3h' },
-  ];
+  const [userPanelOpen,  setUserPanelOpen]  = useState(false);
+  const [notifPanelOpen, setNotifPanelOpen] = useState(false);
 
-  const unreadNotifications = notifications.length;
+  const userRef  = useRef<HTMLDivElement>(null);
+  const notifRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (userRef.current  && !userRef.current.contains(e.target as Node))  setUserPanelOpen(false);
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) setNotifPanelOpen(false);
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, []);
+
+  const initials = user?.nome
+    ? user.nome.split(" ").map(w => w[0]).slice(0, 2).join("").toUpperCase()
+    : "?";
 
   return (
-    <header
-      style={{
-        background: "linear-gradient(135deg, rgba(44, 24, 16, 0.97) 0%, rgba(74, 44, 42, 0.97) 50%, rgba(139, 69, 19, 0.97) 100%)",
-        backdropFilter: "blur(20px)",
-        WebkitBackdropFilter: "blur(20px)",
-        borderBottom: "1px solid rgba(212, 168, 83, 0.2)",
-        boxShadow: "0 8px 32px rgba(0, 0, 0, 0.25)",
+    <>
+      {/* ── HEADER BAR ─────────────────────────────────────────── */}
+      <header style={{
+        background: "linear-gradient(135deg, #1a0f0a 0%, #2C1810 40%, #4A2C2A 80%, #6b3a28 100%)",
+        borderBottom: "1px solid rgba(212,168,83,0.25)",
+        boxShadow: "0 4px 24px rgba(0,0,0,0.35)",
         position: "sticky",
         top: 0,
         zIndex: 1000,
-      }}
-    >
-      <div
-        style={{
-          padding: "1rem 2rem",
+      }}>
+        <div style={{
+          position: "absolute", inset: 0, opacity: 0.04,
+          backgroundImage: "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
+          pointerEvents: "none",
+        }} />
+
+        <div style={{
+          padding: "1.125rem 2rem",
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          gap: "2rem",
-        }}
-      >
-        {/* Logo + Brand */}
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          style={{ display: "flex", alignItems: "center", gap: "1rem" }}
-        >
-          <div
-            style={{
-              background: "rgba(212, 168, 83, 0.15)",
-              padding: "0.75rem",
-              borderRadius: "1rem",
-              display: "flex",
-              backdropFilter: "blur(10px)",
-              border: "1px solid rgba(212, 168, 83, 0.3)",
-            }}
+          gap: "1.5rem",
+          position: "relative",
+        }}>
+
+          {/* ── LOGO ── */}
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            style={{ display: "flex", alignItems: "center", gap: "1rem", flexShrink: 0 }}
           >
-            <Coffee style={{ width: "2rem", height: "2rem", color: "#D4A853" }} />
+            <div style={{
+              width: 52, height: 52,
+              background: "linear-gradient(135deg, rgba(212,168,83,0.2), rgba(200,134,10,0.1))",
+              border: "1.5px solid rgba(212,168,83,0.4)",
+              borderRadius: "0.875rem",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              backdropFilter: "blur(8px)",
+            }}>
+              <Coffee size={28} style={{ color: "#D4A853" }} />
+            </div>
+            <div>
+              <div style={{ fontSize: "1.375rem", fontWeight: 700, color: "#fff", lineHeight: 1, letterSpacing: "-0.02em" }}>
+                Fazenda Café
+              </div>
+              <div style={{ fontSize: "0.75rem", color: "rgba(212,168,83,0.75)", fontWeight: 500, marginTop: 3, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+                Monitoramento Agrícola
+              </div>
+            </div>
+          </motion.div>
+
+          {/* ── STATS ── */}
+          <div style={{ display: "flex", gap: "0.625rem", alignItems: "center", flex: 1, justifyContent: "center", flexWrap: "wrap" }}>
+            <StatPill icon={<MapPin size={16} />}  label="Talhões"     value={totals.totalTalhoes}                onClick={onListaTalhoes}    delay={0.05} />
+            <StatPill icon={<Camera size={16} />}  label="Pontos Foto" value={totals.totalArmadilhas}             onClick={onListaArmadilhas} delay={0.1}  />
+            <StatPill icon={<Coffee size={16} />}  label="Brocas"      value={totals.totalPragas} accent="#ef4444" delay={0.15} />
+            <StatPill icon={<Leaf size={16} />}    label="Área"        value={`${totals.areaTotal.toFixed(1)}ha`} delay={0.2} />
           </div>
-          <div>
-            <h1
-              style={{
-                fontSize: "1.5rem",
-                fontWeight: 700,
-                color: "white",
-                margin: 0,
-                lineHeight: 1,
-              }}
-            >
-              Fazenda Café
-            </h1>
-            <p
-              style={{
-                color: "rgba(212, 168, 83, 0.9)",
-                fontSize: "0.75rem",
-                marginTop: "0.25rem",
-                fontWeight: 500,
-              }}
-            >
-              Sistema de Monitoramento Agrícola
-            </p>
-          </div>
-        </motion.div>
 
-        {/* Stats Cards */}
-        <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
-          <StatCard
-            icon={<MapPin size={18} />}
-            label="Talhões"
-            value={totals.totalTalhoes}
-            onClick={onListaTalhoes}
-            delay={0.1}
-          />
-          <StatCard
-            icon={<Camera size={18} />}
-            label="Pontos de Foto"
-            value={totals.totalArmadilhas}
-            onClick={onListaArmadilhas}
-            delay={0.2}
-          />
-          <StatCard
-            icon={<Coffee size={18} />}
-            label="Brocas"
-            value={totals.totalPragas}
-            color="#ef4444"
-            delay={0.3}
-          />
-          <StatCard
-            icon={<TrendingUp size={18} />}
-            label="Área"
-            value={`${totals.areaTotal.toFixed(1)}ha`}
-            delay={0.4}
-          />
-        </div>
+          {/* ── RIGHT ACTIONS ── */}
+          <div style={{ display: "flex", gap: "0.625rem", alignItems: "center", flexShrink: 0 }}>
 
-        {/* Actions */}
-        <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
-          {/* Dashboard Button */}
-          <motion.button
-            whileHover={{ scale: 1.05, y: -2 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => router.push('/dashboard')}
-            style={{
-              background: "rgba(212, 168, 83, 0.15)",
-              border: "1px solid rgba(212, 168, 83, 0.3)",
-              padding: "0.625rem 1rem",
-              borderRadius: "0.75rem",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: "0.5rem",
-              color: "white",
-              fontWeight: 600,
-              fontSize: "0.875rem",
-              backdropFilter: "blur(10px)",
-              transition: "all 0.2s",
-            }}
-          >
-            <BarChart3 size={18} />
-            Dashboard
-          </motion.button>
-
-          {/* Notifications */}
-          <div style={{ position: "relative" }}>
+            {/* Dashboard */}
             <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => setShowNotifications(!showNotifications)}
+              whileHover={{ scale: 1.04, y: -1 }}
+              whileTap={{ scale: 0.97 }}
+              onClick={() => router.push("/dashboard")}
               style={{
-                background: "rgba(212, 168, 83, 0.15)",
-                border: "1px solid rgba(212, 168, 83, 0.3)",
-                padding: "0.625rem",
+                display: "flex", alignItems: "center", gap: "0.5rem",
+                padding: "0.625rem 1.125rem",
+                background: "rgba(212,168,83,0.1)",
+                border: "1px solid rgba(212,168,83,0.25)",
                 borderRadius: "0.75rem",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                color: "white",
-                backdropFilter: "blur(10px)",
-                position: "relative",
+                color: "rgba(255,255,255,0.9)",
+                fontSize: "0.875rem", fontWeight: 600,
+                cursor: "pointer", backdropFilter: "blur(8px)",
               }}
             >
-              <Bell size={20} />
-              {unreadNotifications > 0 && (
-                <span
-                  style={{
-                    position: "absolute",
-                    top: -4,
-                    right: -4,
-                    background: "#ef4444",
-                    color: "white",
-                    fontSize: "0.65rem",
-                    fontWeight: 700,
-                    padding: "0.15rem 0.4rem",
-                    borderRadius: "999px",
-                    border: "2px solid rgba(44, 24, 16, 0.97)",
-                  }}
-                >
-                  {unreadNotifications}
-                </span>
-              )}
+              <BarChart3 size={18} style={{ color: "#D4A853" }} />
+              Dashboard
             </motion.button>
 
-            <AnimatePresence>
-              {showNotifications && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                  style={{
-                    position: "absolute",
-                    top: "calc(100% + 0.5rem)",
-                    right: 0,
-                    background: "white",
-                    borderRadius: "1rem",
-                    boxShadow: "0 20px 40px rgba(0, 0, 0, 0.15)",
-                    border: "1px solid #e5e7eb",
-                    width: "320px",
-                    maxHeight: "400px",
-                    overflowY: "auto",
-                    zIndex: 2000,
-                  }}
-                >
-                  <div
-                    style={{
-                      padding: "1rem",
-                      borderBottom: "1px solid #e5e7eb",
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                    }}
-                  >
-                    <h3 style={{ margin: 0, fontSize: "0.95rem", fontWeight: 700, color: "#1f2937" }}>
-                      Notificações
-                    </h3>
-                    <span style={{ fontSize: "0.75rem", color: "#6b7280", fontWeight: 600 }}>
-                      {unreadNotifications} novas
-                    </span>
-                  </div>
-                  {notifications.map((notif) => (
-                    <div
-                      key={notif.id}
-                      style={{
-                        padding: "0.875rem 1rem",
-                        borderBottom: "1px solid #f3f4f6",
-                        cursor: "pointer",
-                        transition: "background 0.2s",
-                      }}
-                      onMouseEnter={(e) => (e.currentTarget.style.background = "#fdf6f0")}
-                      onMouseLeave={(e) => (e.currentTarget.style.background = "white")}
-                    >
-                      <div style={{ display: "flex", gap: "0.75rem", alignItems: "flex-start" }}>
-                        <div
-                          style={{
-                            width: "8px",
-                            height: "8px",
-                            borderRadius: "50%",
-                            background:
-                              notif.type === "warning"
-                                ? "#C8860A"
-                                : notif.type === "success"
-                                ? "#8B4513"
-                                : "#3b82f6",
-                            marginTop: "0.25rem",
-                          }}
-                        />
-                        <div style={{ flex: 1 }}>
-                          <p style={{ margin: 0, fontSize: "0.875rem", color: "#374151", fontWeight: 500 }}>
-                            {notif.message}
-                          </p>
-                          <span style={{ fontSize: "0.75rem", color: "#9ca3af" }}>{notif.time} atrás</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                  <div
-                    style={{
-                      padding: "0.75rem 1rem",
-                      textAlign: "center",
-                      borderTop: "1px solid #e5e7eb",
-                    }}
-                  >
-                    <button
-                      style={{
-                        background: "transparent",
-                        border: "none",
-                        color: "#4A2C2A",
-                        fontSize: "0.875rem",
-                        fontWeight: 600,
-                        cursor: "pointer",
-                      }}
-                    >
-                      Ver todas
-                    </button>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-
-          {/* User Menu */}
-          {user && (
-            <div style={{ position: "relative" }}>
+            {/* Notifications */}
+            <div ref={notifRef} style={{ position: "relative" }}>
               <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => setShowUserMenu(!showUserMenu)}
+                whileHover={{ scale: 1.08 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => { setNotifPanelOpen(p => !p); setUserPanelOpen(false); }}
                 style={{
-                  background: "rgba(212, 168, 83, 0.15)",
-                  border: "1px solid rgba(212, 168, 83, 0.3)",
-                  padding: "0.5rem 0.875rem",
+                  width: 44, height: 44,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  background: "rgba(212,168,83,0.1)",
+                  border: "1px solid rgba(212,168,83,0.25)",
                   borderRadius: "0.75rem",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.625rem",
-                  backdropFilter: "blur(10px)",
+                  cursor: "pointer", color: "rgba(255,255,255,0.8)",
+                  position: "relative",
                 }}
               >
-                <div
-                  style={{
-                    width: "32px",
-                    height: "32px",
-                    borderRadius: "50%",
-                    background: "linear-gradient(135deg, #8B4513, #C8860A)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color: "white",
-                    fontWeight: 700,
-                    fontSize: "0.875rem",
-                    border: "2px solid rgba(212, 168, 83, 0.4)",
-                  }}
-                >
-                  {user.nome.charAt(0).toUpperCase()}
-                </div>
-                <div style={{ textAlign: "left" }}>
-                  <p
-                    style={{
-                      margin: 0,
-                      fontSize: "0.875rem",
-                      fontWeight: 600,
-                      color: "white",
-                      lineHeight: 1,
-                    }}
-                  >
-                    {user.nome}
-                  </p>
-                  <p
-                    style={{
-                      margin: 0,
-                      fontSize: "0.7rem",
-                      color: "rgba(212, 168, 83, 0.9)",
-                      marginTop: "0.125rem",
-                    }}
-                  >
-                    {user.fazenda || user.email}
-                  </p>
-                </div>
-                <ChevronDown
-                  size={16}
-                  style={{
-                    color: "rgba(212, 168, 83, 0.8)",
-                    transition: "transform 0.2s",
-                    transform: showUserMenu ? "rotate(180deg)" : "rotate(0deg)",
-                  }}
-                />
+                <Bell size={20} />
+                <span style={{
+                  position: "absolute", top: -4, right: -4,
+                  background: "#ef4444", color: "#fff",
+                  fontSize: "0.65rem", fontWeight: 700,
+                  padding: "2px 6px", borderRadius: 999,
+                  border: "2px solid #1a0f0a",
+                }}>
+                  {notifications.length}
+                </span>
               </motion.button>
 
               <AnimatePresence>
-                {showUserMenu && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                    style={{
-                      position: "absolute",
-                      top: "calc(100% + 0.5rem)",
-                      right: 0,
-                      background: "white",
-                      borderRadius: "1rem",
-                      boxShadow: "0 20px 40px rgba(0, 0, 0, 0.15)",
-                      border: "1px solid #e5e7eb",
-                      width: "240px",
-                      overflow: "hidden",
-                      zIndex: 2000,
-                    }}
-                  >
-                    <div style={{ padding: "1rem", borderBottom: "1px solid #e5e7eb" }}>
-                      <p style={{ margin: 0, fontSize: "0.875rem", fontWeight: 600, color: "#374151" }}>
-                        {user.nome}
-                      </p>
-                      <p style={{ margin: 0, fontSize: "0.75rem", color: "#9ca3af", marginTop: "0.25rem" }}>
-                        {user.email}
-                      </p>
-                    </div>
-                    <MenuItem
-                      icon={<User size={16} />}
-                      label="Meu Perfil"
-                      onClick={() => {
-                        setShowUserMenu(false);
-                        alert("Perfil (em desenvolvimento)");
-                      }}
-                    />
-                    <MenuItem
-                      icon={<Settings size={16} />}
-                      label="Configurações"
-                      onClick={() => {
-                        setShowUserMenu(false);
-                        alert("Configurações (em desenvolvimento)");
-                      }}
-                    />
-                    <div style={{ borderTop: "1px solid #e5e7eb" }}>
-                      <MenuItem
-                        icon={<LogOut size={16} />}
-                        label="Sair"
-                        onClick={logout}
-                        danger
-                      />
-                    </div>
-                  </motion.div>
+                {notifPanelOpen && (
+                  <NotifDropdown onClose={() => setNotifPanelOpen(false)} />
                 )}
               </AnimatePresence>
             </div>
-          )}
+
+            {/* User avatar */}
+            {user && (
+              <div ref={userRef}>
+                <motion.button
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => { setUserPanelOpen(p => !p); setNotifPanelOpen(false); }}
+                  style={{
+                    display: "flex", alignItems: "center", gap: "0.625rem",
+                    padding: "0.5rem 0.875rem 0.5rem 0.5rem",
+                    background: userPanelOpen ? "rgba(212,168,83,0.2)" : "rgba(212,168,83,0.08)",
+                    border: `1px solid ${userPanelOpen ? "rgba(212,168,83,0.5)" : "rgba(212,168,83,0.2)"}`,
+                    borderRadius: "0.875rem",
+                    cursor: "pointer",
+                    transition: "all 0.2s",
+                  }}
+                >
+                  <div style={{
+                    width: 38, height: 38, borderRadius: "50%",
+                    background: "linear-gradient(135deg, #8B4513, #C8860A)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    color: "#fff", fontWeight: 700, fontSize: "0.9rem",
+                    border: "2px solid rgba(212,168,83,0.5)",
+                    flexShrink: 0,
+                  }}>
+                    {initials}
+                  </div>
+                  <div style={{ textAlign: "left", lineHeight: 1.3 }}>
+                    <div style={{ fontSize: "0.875rem", fontWeight: 700, color: "#fff", maxWidth: 110, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {user.nome.split(" ")[0]}
+                    </div>
+                    <div style={{ fontSize: "0.72rem", color: "rgba(212,168,83,0.8)" }}>
+                      {user.fazenda || "Fazenda"}
+                    </div>
+                  </div>
+                  <ChevronDown size={15} style={{
+                    color: "rgba(212,168,83,0.7)",
+                    transition: "transform 0.25s",
+                    transform: userPanelOpen ? "rotate(180deg)" : "rotate(0deg)",
+                  }} />
+                </motion.button>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
-    </header>
+      </header>
+
+      {/* ── USER SIDE PANEL ─────────────────────────────────────── */}
+      <AnimatePresence>
+        {userPanelOpen && user && (
+          <>
+            <motion.div
+              key="user-backdrop"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setUserPanelOpen(false)}
+              style={{
+                position: "fixed", inset: 0,
+                background: "rgba(0,0,0,0.35)",
+                backdropFilter: "blur(2px)",
+                zIndex: 2000,
+              }}
+            />
+
+            <motion.div
+              key="user-panel"
+              initial={{ x: "100%", opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: "100%", opacity: 0 }}
+              transition={{ type: "spring", stiffness: 340, damping: 32 }}
+              style={{
+                position: "fixed",
+                top: 0, right: 0,
+                width: 320,
+                height: "100vh",
+                background: "linear-gradient(180deg, #1a0f0a 0%, #2C1810 100%)",
+                borderLeft: "1px solid rgba(212,168,83,0.2)",
+                boxShadow: "-12px 0 40px rgba(0,0,0,0.4)",
+                zIndex: 2001,
+                display: "flex",
+                flexDirection: "column",
+                overflow: "hidden",
+              }}
+            >
+              <div style={{
+                position: "absolute", inset: 0, opacity: 0.05,
+                backgroundImage: "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
+                pointerEvents: "none",
+              }} />
+
+              <button
+                onClick={() => setUserPanelOpen(false)}
+                style={{
+                  position: "absolute", top: 18, right: 18,
+                  width: 36, height: 36,
+                  background: "rgba(255,255,255,0.07)",
+                  border: "1px solid rgba(255,255,255,0.12)",
+                  borderRadius: "0.625rem",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  cursor: "pointer", color: "rgba(255,255,255,0.6)",
+                  zIndex: 1,
+                }}
+              >
+                <X size={18} />
+              </button>
+
+              {/* Profile */}
+              <div style={{
+                padding: "2.75rem 2rem 2rem",
+                borderBottom: "1px solid rgba(212,168,83,0.15)",
+                position: "relative",
+              }}>
+                <div style={{
+                  width: 80, height: 80, borderRadius: "50%",
+                  background: "linear-gradient(135deg, #8B4513, #C8860A)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  color: "#fff", fontWeight: 700, fontSize: "1.75rem",
+                  border: "3px solid rgba(212,168,83,0.4)",
+                  boxShadow: "0 8px 24px rgba(139,69,19,0.4)",
+                  marginBottom: "1.125rem",
+                }}>
+                  {initials}
+                </div>
+
+                <div style={{ fontSize: "1.2rem", fontWeight: 700, color: "#fff", marginBottom: 4 }}>
+                  {user.nome}
+                </div>
+                <div style={{ fontSize: "0.875rem", color: "rgba(212,168,83,0.75)", marginBottom: 10 }}>
+                  {user.email}
+                </div>
+                {user.fazenda && (
+                  <div style={{
+                    display: "inline-flex", alignItems: "center", gap: 6,
+                    background: "rgba(212,168,83,0.12)",
+                    border: "1px solid rgba(212,168,83,0.25)",
+                    padding: "0.3rem 0.75rem",
+                    borderRadius: 999,
+                    fontSize: "0.8rem", fontWeight: 600, color: "#D4A853",
+                  }}>
+                    <Map size={13} />
+                    {user.fazenda}
+                  </div>
+                )}
+              </div>
+
+              {/* Menu items */}
+              <div style={{ padding: "1.25rem 1rem", flex: 1 }}>
+                <PanelMenuItem
+                  icon={<User size={18} />}
+                  label="Meu Perfil"
+                  description="Editar informações pessoais"
+                  onClick={() => { setUserPanelOpen(false); alert("Perfil (em breve)"); }}
+                />
+                <PanelMenuItem
+                  icon={<Settings size={18} />}
+                  label="Configurações"
+                  description="Preferências do sistema"
+                  onClick={() => { setUserPanelOpen(false); alert("Configurações (em breve)"); }}
+                />
+                <PanelMenuItem
+                  icon={<BarChart3 size={18} />}
+                  label="Dashboard"
+                  description="Análises e gráficos"
+                  onClick={() => { setUserPanelOpen(false); router.push("/dashboard"); }}
+                />
+              </div>
+
+              {/* Logout */}
+              <div style={{ padding: "1.25rem 1rem 2rem", borderTop: "1px solid rgba(212,168,83,0.12)" }}>
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={logout}
+                  style={{
+                    width: "100%",
+                    display: "flex", alignItems: "center", gap: "0.875rem",
+                    padding: "1rem 1.125rem",
+                    background: "rgba(239,68,68,0.08)",
+                    border: "1px solid rgba(239,68,68,0.2)",
+                    borderRadius: "0.875rem",
+                    color: "#f87171",
+                    fontSize: "0.95rem", fontWeight: 600,
+                    cursor: "pointer",
+                    transition: "all 0.2s",
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.background = "rgba(239,68,68,0.15)";
+                    e.currentTarget.style.borderColor = "rgba(239,68,68,0.4)";
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.background = "rgba(239,68,68,0.08)";
+                    e.currentTarget.style.borderColor = "rgba(239,68,68,0.2)";
+                  }}
+                >
+                  <LogOut size={19} />
+                  Sair da conta
+                </motion.button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </>
   );
 }
 
-// ============================================
-// COMPONENTES AUXILIARES
-// ============================================
+// ── SUB-COMPONENTS ────────────────────────────────────────────────
 
-function StatCard({ icon, label, value, color, onClick, delay }: any) {
+function StatPill({ icon, label, value, accent, onClick, delay }: {
+  icon: React.ReactNode;
+  label: string;
+  value: string | number;
+  accent?: string;
+  onClick?: () => void;
+  delay?: number;
+}) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: -20 }}
+      initial={{ opacity: 0, y: -12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay }}
-      whileHover={{ y: -4, scale: 1.05 }}
+      transition={{ delay: delay ?? 0 }}
+      whileHover={onClick ? { y: -2, scale: 1.04 } : {}}
       onClick={onClick}
       style={{
-        background: "rgba(212, 168, 83, 0.12)",
-        backdropFilter: "blur(10px)",
-        border: "1px solid rgba(212, 168, 83, 0.25)",
-        padding: "0.75rem 1rem",
-        borderRadius: "0.875rem",
+        display: "flex", alignItems: "center", gap: "0.5rem",
+        padding: "0.55rem 1rem",
+        background: "rgba(255,255,255,0.05)",
+        border: "1px solid rgba(212,168,83,0.18)",
+        borderRadius: "0.75rem",
         cursor: onClick ? "pointer" : "default",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        gap: "0.375rem",
-        minWidth: "90px",
+        backdropFilter: "blur(6px)",
         transition: "all 0.2s",
+        userSelect: "none",
       }}
     >
-      <div style={{ color: color || "#D4A853", opacity: 0.95 }}>{icon}</div>
-      <div style={{ fontSize: "1.25rem", fontWeight: 700, color: "white", lineHeight: 1 }}>
+      <span style={{ color: accent || "#D4A853", opacity: 0.9 }}>{icon}</span>
+      <span style={{ fontSize: "1.1rem", fontWeight: 700, color: accent || "#fff", lineHeight: 1 }}>
         {value}
-      </div>
-      <div
-        style={{
-          fontSize: "0.7rem",
-          color: "rgba(212, 168, 83, 0.85)",
-          fontWeight: 600,
-          textTransform: "uppercase",
-          letterSpacing: "0.5px",
-        }}
-      >
+      </span>
+      <span style={{ fontSize: "0.72rem", color: "rgba(212,168,83,0.65)", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.04em" }}>
         {label}
+      </span>
+    </motion.div>
+  );
+}
+
+function NotifDropdown({ onClose }: { onClose: () => void }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -8, scale: 0.96 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -8, scale: 0.96 }}
+      transition={{ type: "spring", stiffness: 380, damping: 28 }}
+      style={{
+        position: "absolute",
+        top: "calc(100% + 12px)",
+        right: 0,
+        width: 320,
+        background: "#1e1008",
+        border: "1px solid rgba(212,168,83,0.2)",
+        borderRadius: "1rem",
+        boxShadow: "0 16px 40px rgba(0,0,0,0.45)",
+        overflow: "hidden",
+        zIndex: 2100,
+      }}
+    >
+      <div style={{
+        padding: "1rem 1.25rem",
+        borderBottom: "1px solid rgba(212,168,83,0.12)",
+        display: "flex", justifyContent: "space-between", alignItems: "center",
+      }}>
+        <span style={{ fontWeight: 700, color: "#fff", fontSize: "1rem" }}>Notificações</span>
+        <span style={{
+          fontSize: "0.75rem", background: "rgba(212,168,83,0.15)",
+          color: "#D4A853", padding: "3px 10px", borderRadius: 999, fontWeight: 600,
+        }}>
+          {notifications.length} novas
+        </span>
+      </div>
+
+      {notifications.map(n => (
+        <div key={n.id} style={{
+          padding: "0.875rem 1.25rem",
+          borderBottom: "1px solid rgba(255,255,255,0.05)",
+          display: "flex", gap: "0.875rem", alignItems: "flex-start",
+          cursor: "pointer", transition: "background 0.15s",
+        }}
+          onMouseEnter={e => (e.currentTarget.style.background = "rgba(212,168,83,0.06)")}
+          onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+        >
+          <div style={{
+            width: 9, height: 9, borderRadius: "50%", marginTop: 5, flexShrink: 0,
+            background: n.type === "warning" ? "#C8860A" : n.type === "success" ? "#8B4513" : "#3b82f6",
+          }} />
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: "0.875rem", color: "rgba(255,255,255,0.85)", fontWeight: 500, lineHeight: 1.4 }}>
+              {n.message}
+            </div>
+            <div style={{ fontSize: "0.75rem", color: "rgba(212,168,83,0.55)", marginTop: 3 }}>
+              {n.time} atrás
+            </div>
+          </div>
+        </div>
+      ))}
+
+      <div style={{ padding: "0.75rem 1.25rem", textAlign: "center" }}>
+        <button onClick={onClose} style={{
+          background: "transparent", border: "none",
+          color: "#D4A853", fontSize: "0.875rem", fontWeight: 600,
+          cursor: "pointer",
+        }}>
+          Ver todas →
+        </button>
       </div>
     </motion.div>
   );
 }
 
-function MenuItem({ icon, label, onClick, danger }: any) {
+function PanelMenuItem({ icon, label, description, onClick }: {
+  icon: React.ReactNode;
+  label: string;
+  description: string;
+  onClick: () => void;
+}) {
   return (
-    <button
+    <motion.button
+      whileHover={{ x: 4 }}
       onClick={onClick}
       style={{
         width: "100%",
-        padding: "0.75rem 1rem",
+        display: "flex", alignItems: "center", gap: "1rem",
+        padding: "0.875rem 1rem",
         background: "transparent",
-        border: "none",
-        display: "flex",
-        alignItems: "center",
-        gap: "0.75rem",
+        border: "1px solid transparent",
+        borderRadius: "0.875rem",
         cursor: "pointer",
-        fontSize: "0.875rem",
-        fontWeight: 500,
-        color: danger ? "#ef4444" : "#374151",
-        transition: "background 0.2s",
+        textAlign: "left",
+        marginBottom: "0.375rem",
+        transition: "all 0.2s",
       }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.background = danger ? "#fef2f2" : "#fdf6f0";
+      onMouseEnter={e => {
+        e.currentTarget.style.background = "rgba(212,168,83,0.08)";
+        e.currentTarget.style.borderColor = "rgba(212,168,83,0.15)";
       }}
-      onMouseLeave={(e) => {
+      onMouseLeave={e => {
         e.currentTarget.style.background = "transparent";
+        e.currentTarget.style.borderColor = "transparent";
       }}
     >
-      {icon}
-      {label}
-    </button>
+      <div style={{
+        width: 42, height: 42, borderRadius: "0.75rem",
+        background: "rgba(212,168,83,0.1)",
+        border: "1px solid rgba(212,168,83,0.2)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        color: "#D4A853", flexShrink: 0,
+      }}>
+        {icon}
+      </div>
+      <div>
+        <div style={{ fontSize: "0.95rem", fontWeight: 600, color: "#fff", lineHeight: 1 }}>
+          {label}
+        </div>
+        <div style={{ fontSize: "0.78rem", color: "rgba(212,168,83,0.55)", marginTop: 4 }}>
+          {description}
+        </div>
+      </div>
+    </motion.button>
   );
 }

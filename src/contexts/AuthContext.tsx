@@ -29,15 +29,25 @@ interface RegisterData {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// 🔥 CONFIGURAÇÃO DA API - MUDE AQUI QUANDO SUBIR PRO AZURE
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3333';
+
+function clearAuthData() {
+  localStorage.removeItem('auth_token');
+  localStorage.removeItem('user_data');
+  document.cookie = 'auth_token=; path=/; max-age=0';
+}
+
+function redirectToLogin() {
+  if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/auth/')) {
+    window.location.replace('/auth/login');
+  }
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  // Verifica se está logado ao carregar
   useEffect(() => {
     checkAuth();
   }, []);
@@ -45,126 +55,94 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const checkAuth = async () => {
     try {
       const token = localStorage.getItem('auth_token');
-      
-      if (token) {
-        // Verifica se o token é válido com a API
-        const response = await fetch(`${API_URL}/usuarios/verificar`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ token }),
-        });
 
-        if (response.ok) {
-          const userData = await response.json();
-          setUser({
-            id: userData.id.toString(),
-            nome: userData.nome,
-            email: userData.email,
-          });
-        } else {
-          // Token inválido, limpa o localStorage
-          localStorage.removeItem('auth_token');
-          localStorage.removeItem('user_data');
-        }
+      if (!token) {
+        clearAuthData();
+        redirectToLogin();
+        setLoading(false);
+        return;
       }
-    } catch (error) {
-      console.error('Erro ao verificar autenticação:', error);
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('user_data');
+
+      const response = await fetch(`${API_URL}/usuarios/verificar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token }),
+      });
+
+      if (response.ok) {
+        const userData = await response.json();
+        setUser({
+          id: userData.id.toString(),
+          nome: userData.nome,
+          email: userData.email,
+          fazenda: userData.fazenda,
+        });
+      } else {
+        // Token inválido — limpa e redireciona sem mostrar erro
+        clearAuthData();
+        redirectToLogin();
+      }
+    } catch {
+      // Erro de rede — só limpa, não redireciona (evita loop se API offline)
+      clearAuthData();
     } finally {
       setLoading(false);
     }
   };
 
   const login = async (email: string, password: string, rememberMe = false) => {
-    try {
-      const response = await fetch(`${API_URL}/usuarios/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email,
-          senha: password,
-        }),
-      });
+    const response = await fetch(`${API_URL}/usuarios/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, senha: password }),
+    });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.erro || 'Erro ao fazer login');
-      }
-
-      const data = await response.json();
-
-      const userData: User = {
-        id: data.id.toString(),
-        nome: data.nome,
-        email: data.email,
-      };
-
-      // Salva no localStorage
-      localStorage.setItem('auth_token', data.token);
-      localStorage.setItem('user_data', JSON.stringify(userData));
-
-      // Define cookie
-      document.cookie = `auth_token=${data.token}; path=/; ${
-        rememberMe ? 'max-age=2592000' : ''
-      }`;
-
-      // Atualiza o estado
-      setUser(userData);
-
-    } catch (error) {
-      throw error;
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.erro || 'E-mail ou senha inválidos.');
     }
+
+    const data = await response.json();
+
+    const userData: User = {
+      id: data.id.toString(),
+      nome: data.nome,
+      email: data.email,
+      fazenda: data.fazenda,
+    };
+
+    localStorage.setItem('auth_token', data.token);
+    localStorage.setItem('user_data', JSON.stringify(userData));
+    document.cookie = `auth_token=${data.token}; path=/;${rememberMe ? ' max-age=2592000' : ''}`;
+
+    setUser(userData);
   };
 
   const logout = () => {
-    // Remove do localStorage
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('user_data');
-
-    // Remove cookie
-    document.cookie = 'auth_token=; path=/; max-age=0';
-
-    // Limpa estado
+    clearAuthData();
     setUser(null);
-
-    // Redireciona pro login
     router.push('/auth/login');
   };
 
   const register = async (data: RegisterData) => {
-    try {
-      const response = await fetch(`${API_URL}/usuarios`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            nome: data.nomeCompleto ?? data.email,
-            email: data.email,
-            senha: data.password,
-            telefone: data.telefone,
-            fazenda: data.fazenda,
-          }),
-      });
+    const response = await fetch(`${API_URL}/usuarios`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        nome: data.nomeCompleto ?? data.email,
+        email: data.email,
+        senha: data.password,
+        telefone: data.telefone,
+        fazenda: data.fazenda,
+      }),
+    });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.erro || 'Erro ao criar conta');
-      }
-
-      const responseData = await response.json();
-
-      // Após criar, faz login automático
-      await login(data.email, data.password, false);
-
-    } catch (error) {
-      throw error;
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.erro || 'Erro ao criar conta.');
     }
+
+    await login(data.email, data.password, false);
   };
 
   return (
@@ -174,7 +152,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-// Hook customizado para usar o contexto
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
