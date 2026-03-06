@@ -5,7 +5,7 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { 
-  Bug, 
+  Coffee, 
   Mail, 
   Lock, 
   Eye, 
@@ -119,11 +119,11 @@ export default function CadastroPage() {
       <div className={styles.authCard}>
         <div className={styles.authHeader}>
           <div className={styles.authLogo}>
-            <Bug />
+            <Coffee />
             <h1 className={styles.authTitle}>Criar Conta</h1>
           </div>
           <p className={styles.authSubtitle}>
-            Junte-se ao melhor sistema de monitoramento agrícola
+            Junte-se ao melhor sistema de monitoramento de café
           </p>
         </div>
 
@@ -183,7 +183,6 @@ export default function CadastroPage() {
               </div>
             </div>
 
-            {/* 🔥 GRID 2 COLUNAS - CORRIGIDO */}
             <div className={styles.formGroup}>
               <label className={styles.formLabel} htmlFor="telefone">
                 <Phone />
@@ -214,7 +213,7 @@ export default function CadastroPage() {
                   id="fazenda"
                   type="text"
                   className={styles.formInput}
-                  placeholder="Nome da fazenda"
+                  placeholder="Nome da fazenda de café"
                   value={formData.fazenda}
                   onChange={(e) => handleInputChange("fazenda", e.target.value)}
                   disabled={loading}
@@ -313,7 +312,7 @@ export default function CadastroPage() {
                 Aceito os{" "}
                 <a 
                   href="/termos" 
-                  style={{ color: "#15803d", fontWeight: 600 }}
+                  style={{ color: "#4A2C2A", fontWeight: 600 }}
                   target="_blank"
                 >
                   termos de uso
@@ -321,7 +320,7 @@ export default function CadastroPage() {
                 {" "}e{" "}
                 <a 
                   href="/privacidade" 
-                  style={{ color: "#15803d", fontWeight: 600 }}
+                  style={{ color: "#4A2C2A", fontWeight: 600 }}
                   target="_blank"
                 >
                   política de privacidade

@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Fazenda Santa Rita - Sistema de Monitoramento",
-  description: "Sistema de monitoramento GPS para cana-de-açúcar",
+  title: "Fazenda Café - Sistema de Monitoramento",
+  description: "Sistema de monitoramento GPS para café",
 };
 
 export default function RootLayout({

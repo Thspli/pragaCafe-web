@@ -1,3 +1,5 @@
+// src/components/map/TalhaoMap.tsx
+// MUDANÇAS: cana → café, verde → marrom/caramelo
 "use client";
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
@@ -247,7 +249,6 @@ export function TalhaoMap({
     };
   }, [mapInitialized, addingArmadilha, talhoes, onAddArmadilha]);
 
-  // 🔥 FIX: Função melhorada para buscar e renderizar armadilhas
   const fetchAndRenderArmadilhasForTalhao = useCallback(async (talhaoId: number) => {
     if (!mapInstanceRef.current) return 0;
     
@@ -258,82 +259,48 @@ export function TalhaoMap({
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3333';
       const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
 
-      // Remove armadilhas antigas DESTE talhão específico
       const oldLayers = armadilhaLayersRef.current.get(talhaoId) || [];
       oldLayers.forEach((layer) => {
-        try {
-          map.removeLayer(layer);
-        } catch (e) {}
+        try { map.removeLayer(layer); } catch (e) {}
       });
       armadilhaLayersRef.current.set(talhaoId, []);
 
-      // Busca armadilhas
       const params = new URLSearchParams();
       params.set('talhaoId', String(talhaoId));
       
-      console.log(`🔍 Buscando armadilhas do talhão ${talhaoId}...`);
-      
       const res = await fetch(`${API_URL}/armadilhas?${params.toString()}`, {
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
-        }
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) }
       });
 
-      if (!res.ok) {
-        console.warn(`⚠️ Erro ao buscar armadilhas do talhão ${talhaoId}: ${res.status}`);
-        return 0;
-      }
+      if (!res.ok) return 0;
 
       const armadilhas = await res.json();
       
-      console.log(`📦 [MAPA] Resposta bruta da API:`, armadilhas);
-      console.log(`📦 [MAPA] Total retornado: ${armadilhas.length}`);
-      
-      // Log de IDs antes de remover duplicatas
-      const ids = armadilhas.map((a: any) => a.id);
-      console.log(`🔢 [MAPA] IDs retornados:`, ids);
-      
-      // Remove duplicatas baseado no ID
       const uniqueArmadilhas = Array.from(
         new Map(armadilhas.map((a: any) => [a.id, a])).values()
       );
-      
-      // Log de IDs depois de remover duplicatas
-      const uniqueIds = uniqueArmadilhas.map((a: any) => a.id);
-      console.log(`🔢 [MAPA] IDs únicos:`, uniqueIds);
-      console.log(`✅ [MAPA] Contagem final: ${uniqueArmadilhas.length} armadilhas no talhão ${talhaoId}`);
 
       const newLayers: any[] = [];
 
       uniqueArmadilhas.forEach((a: any) => {
-        if (a.latitude == null || a.longitude == null) {
-          console.warn(`⚠️ Armadilha ${a.id} sem coordenadas`);
-          return;
-        }
+        if (a.latitude == null || a.longitude == null) return;
 
         const isAusencia = a.ausencia || false;
         
-        // 🔥 NOVO: Ícone profissional de armadilha
+        // Ícone com cores café
         const svg = `
           <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg" class="armadilha-marker-container">
-            <!-- Sombra -->
             <ellipse cx="16" cy="37" rx="8" ry="2" fill="rgba(0,0,0,0.2)"/>
-            
-            <!-- Pin principal -->
             <path d="M16 2C10.477 2 6 6.477 6 12C6 18.5 16 36 16 36C16 36 26 18.5 26 12C26 6.477 21.523 2 16 2Z" 
-                  fill="${isAusencia ? '#94a3b8' : '#f59e0b'}" 
+                  fill="${isAusencia ? '#94a3b8' : '#C8860A'}" 
                   stroke="#ffffff" 
                   stroke-width="2"/>
-            
-            <!-- Ícone de armadilha -->
             ${isAusencia ? `
-              <!-- X para ausência -->
               <line x1="12" y1="10" x2="20" y2="18" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round"/>
               <line x1="20" y1="10" x2="12" y2="18" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round"/>
             ` : `
-              <!-- Armadilha ativa -->
               <rect x="12" y="9" width="8" height="10" rx="1" fill="#ffffff" opacity="0.9"/>
-              <circle cx="16" cy="14" r="2.5" fill="#f59e0b"/>
+              <circle cx="16" cy="14" r="2.5" fill="#C8860A"/>
               <line x1="16" y1="8" x2="16" y2="11" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round"/>
             `}
           </svg>
@@ -352,8 +319,8 @@ export function TalhaoMap({
         const popupHtml = `
           <div style="min-width:180px;font-family:system-ui,-apple-system,sans-serif">
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-              <div style="width:10px;height:10px;border-radius:50%;background:${isAusencia ? '#94a3b8' : '#f59e0b'}"></div>
-              <strong style="font-size:14px;color:#111">${a.nome || 'Armadilha'}</strong>
+              <div style="width:10px;height:10px;border-radius:50%;background:${isAusencia ? '#94a3b8' : '#C8860A'}"></div>
+              <strong style="font-size:14px;color:#2C1810">${a.nome || 'Ponto de Foto'}</strong>
             </div>
             ${a.observacao ? `<div style="font-size:12px;color:#444;margin-bottom:6px">${a.observacao}</div>` : ''}
             <div style="font-size:11px;color:#666;display:flex;flex-direction:column;gap:4px;padding-top:6px;border-top:1px solid #e5e7eb">
@@ -369,28 +336,19 @@ export function TalhaoMap({
           try {
             amarker.on('click', () => onArmadilhaClick(a));
           } catch (e) {
-            try {
-              (amarker as any).openPopup();
-            } catch (err) {}
+            try { (amarker as any).openPopup(); } catch (err) {}
           }
         }
 
         try {
           const el = (amarker as any).getElement && (amarker as any).getElement();
-          if (el && el.classList) {
-            el.classList.add('armadilha-bounce');
-          }
+          if (el && el.classList) el.classList.add('armadilha-bounce');
         } catch (e) {}
 
         newLayers.push(amarker);
       });
 
-      // Salva as novas layers
       armadilhaLayersRef.current.set(talhaoId, newLayers);
-      
-      console.log(`✅ ${newLayers.length} armadilhas renderizadas para talhão ${talhaoId}`);
-      
-      // 🔥 FIX: Retorna a contagem real de armadilhas
       return newLayers.length;
 
     } catch (err) {
@@ -401,30 +359,20 @@ export function TalhaoMap({
 
   // 4. Renderiza talhões
   useEffect(() => {
-    if (!mapInitialized || !mapInstanceRef.current) {
-      console.log("⏳ Aguardando mapa inicializar para renderizar talhões...");
-      return;
-    }
+    if (!mapInitialized || !mapInstanceRef.current) return;
 
     console.log("🎨 RENDERIZANDO", talhoes.length, "TALHÕES");
 
     const L = (window as any).L;
     const { map, layers } = mapInstanceRef.current;
 
-    // Limpa TODAS as layers antigas
     layers.forEach((layer: any) => {
-      try {
-        map.removeLayer(layer);
-      } catch (e) {}
+      try { map.removeLayer(layer); } catch (e) {}
     });
     mapInstanceRef.current.layers = [];
 
-    if (!talhoes.length) {
-      console.log("📭 Nenhum talhão para renderizar");
-      return;
-    }
+    if (!talhoes.length) return;
 
-    // 🔥 FIX: Primeiro busca a contagem real de armadilhas
     (async () => {
       const newCounts = new Map<number, number>();
       
@@ -435,14 +383,12 @@ export function TalhaoMap({
       
       setArmadilhaCountsByTalhao(newCounts);
       
-      // Agora renderiza os talhões com as contagens corretas
       talhoes.forEach((talhao) => {
         if (!talhao.boundary?.length || !talhao.center) return;
 
         const color = getStatusColor(talhao.status);
         const realCount = newCounts.get(talhao.id) || 0;
 
-        // Polígono
         const polygon = L.polygon(talhao.boundary, {
           color,
           fillColor: color,
@@ -456,13 +402,13 @@ export function TalhaoMap({
 
         mapInstanceRef.current.layers.push(polygon);
 
-        // 🔥 FIX: Label com contador REAL de armadilhas
+        // Label com cores café
         const labelHtml = `
           <div style="border:2px solid ${color};background:rgba(255,255,255,0.95);padding:6px 10px;border-radius:6px;font-size:11px;font-weight:600;text-align:center;box-shadow:0 2px 4px rgba(0,0,0,0.12);white-space:nowrap;">
-            <div style="color:#15803d;font-weight:700;">${talhao.nome}</div>
+            <div style="color:#2C1810;font-weight:700;">${talhao.nome}</div>
             <div style="display:flex;gap:8px;align-items:center;justify-content:center;font-size:11px;color:#374151;margin-top:4px;">
-              <div>${talhao.totalPragas ?? 0} pragas</div>
-              <div style="background:#ecfeff;border:1px solid #bffaf0;padding:3px 8px;border-radius:999px;font-weight:700;color:#065f46;font-size:11px;">${realCount} 🪤</div>
+              <div>${talhao.totalPragas ?? 0} brocas</div>
+              <div style="background:#fdf6f0;border:1px solid #D4A853;padding:3px 8px;border-radius:999px;font-weight:700;color:#4A2C2A;font-size:11px;">${realCount} 📸</div>
             </div>
           </div>
         `;
@@ -482,7 +428,6 @@ export function TalhaoMap({
         mapInstanceRef.current.layers.push(marker);
       });
 
-      // Centraliza no último talhão
       const ultimo = talhoes[talhoes.length - 1];
       const hasValidCenter = (() => {
         if (!ultimo || !ultimo.center) return false;
@@ -505,11 +450,8 @@ export function TalhaoMap({
   // Event listener para mudanças em armadilhas
   useEffect(() => {
     const onArmadilhaChanged = async (ev: any) => {
-      console.log("🔄 Evento armadilha:changed recebido", ev?.detail);
-      
       const detail = ev?.detail;
       if (!detail) {
-        console.log("🔄 Atualizando todas as armadilhas...");
         const newCounts = new Map<number, number>();
         for (const t of talhoes) {
           const count = await fetchAndRenderArmadilhasForTalhao(t.id);
@@ -521,7 +463,6 @@ export function TalhaoMap({
 
       const talhaoId = detail.armadilha?.talhaoId || detail.talhaoId;
       if (talhaoId) {
-        console.log(`🔄 Atualizando armadilhas do talhão ${talhaoId}...`);
         const count = await fetchAndRenderArmadilhasForTalhao(talhaoId);
         setArmadilhaCountsByTalhao(prev => {
           const newMap = new Map(prev);
@@ -532,10 +473,7 @@ export function TalhaoMap({
     };
 
     window.addEventListener('armadilha:changed', onArmadilhaChanged as any);
-
-    return () => {
-      window.removeEventListener('armadilha:changed', onArmadilhaChanged as any);
-    };
+    return () => { window.removeEventListener('armadilha:changed', onArmadilhaChanged as any); };
   }, [talhoes, fetchAndRenderArmadilhasForTalhao]);
 
   // Cleanup
@@ -543,9 +481,7 @@ export function TalhaoMap({
     return () => {
       armadilhaLayersRef.current.forEach((layers) => {
         layers.forEach((l) => {
-          try {
-            mapInstanceRef.current?.map?.removeLayer(l);
-          } catch (e) {}
+          try { mapInstanceRef.current?.map?.removeLayer(l); } catch (e) {}
         });
       });
       armadilhaLayersRef.current.clear();
@@ -554,27 +490,22 @@ export function TalhaoMap({
 
   const getStatusColor = (status: string | null): string => {
     switch (status) {
-      case "baixo": return "#22c55e";
-      case "medio": return "#eab308";
-      case "alto": return "#f97316";
-      case "critico": return "#dc2626";
+      case "baixo": return "#8B4513";   // café claro
+      case "medio": return "#C8860A";   // caramelo
+      case "alto":  return "#D4A853";   // dourado
+      case "critico": return "#dc2626"; // vermelho crítico
       default: return "#6b7280";
     }
   };
 
   return (
     <div style={{ padding: "1.5rem", paddingTop: "1rem" }}>
-      <div style={{ 
-        marginBottom: "0.75rem", 
-        display: "flex", 
-        alignItems: "center", 
-        gap: "1rem" 
-      }}>
+      <div style={{ marginBottom: "0.75rem", display: "flex", alignItems: "center", gap: "1rem" }}>
         <button
           onClick={() => setDrawing(!drawing)}
           disabled={!mapInitialized}
           style={{
-            background: !mapInitialized ? "#94a3b8" : drawing ? "#dc2626" : "#22c55e",
+            background: !mapInitialized ? "#94a3b8" : drawing ? "#dc2626" : "#8B4513",
             color: "white",
             fontWeight: 600,
             padding: "0.5rem 1rem",
@@ -594,7 +525,7 @@ export function TalhaoMap({
           onClick={() => setAddingArmadilha(!addingArmadilha)}
           disabled={!mapInitialized}
           style={{
-            background: !mapInitialized ? "#94a3b8" : addingArmadilha ? "#ef4444" : "#10b981",
+            background: !mapInitialized ? "#94a3b8" : addingArmadilha ? "#ef4444" : "#C8860A",
             color: "white",
             fontWeight: 600,
             padding: "0.5rem 1rem",
@@ -607,13 +538,13 @@ export function TalhaoMap({
           {!mapInitialized
             ? "⏳"
             : addingArmadilha
-            ? "❌ Cancelar armadilha"
-            : "➕ Adicionar armadilha"}
+            ? "❌ Cancelar"
+            : "📸 Adicionar ponto de foto"}
         </button>
         
         {mapInitialized && talhoes.length > 0 && (
-          <span style={{ color: "#15803d", fontWeight: 600 }}>
-            📍 {talhoes.length} talhão(ões) no mapa
+          <span style={{ color: "#4A2C2A", fontWeight: 600 }}>
+            ☕ {talhoes.length} talhão(ões) no mapa
           </span>
         )}
       </div>
@@ -623,7 +554,7 @@ export function TalhaoMap({
         style={{
           width: "100%",
           height: "520px",
-          border: "2px solid #22c55e",
+          border: "2px solid #8B4513",
           borderRadius: "0.75rem",
           overflow: "hidden",
           background: "#d4d4d4",
@@ -650,13 +581,13 @@ export function TalhaoMap({
                 width: "40px",
                 height: "40px",
                 border: "4px solid #e2e8f0",
-                borderTop: "4px solid #22c55e",
+                borderTop: "4px solid #8B4513",
                 borderRadius: "50%",
                 margin: "0 auto 1rem",
                 animation: "spin 1s linear infinite",
               }}
             />
-            <p style={{ color: "#15803d", fontWeight: 600, margin: 0 }}>
+            <p style={{ color: "#4A2C2A", fontWeight: 600, margin: 0 }}>
               🛰️ Carregando mapa satélite...
             </p>
             <style>{`

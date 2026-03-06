@@ -5,7 +5,7 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { 
-  Bug, 
+  Coffee, 
   Mail, 
   Lock, 
   Eye, 
@@ -44,7 +44,6 @@ export default function LoginPage() {
     setError("");
     setSuccess("");
 
-    // Validações básicas
     if (!email || !password) {
       setError("Por favor, preencha todos os campos!");
       return;
@@ -62,9 +61,7 @@ export default function LoginPage() {
       
       setSuccess("Login realizado com sucesso!");
       
-      // Pega a URL de redirecionamento ou vai pra home
       setTimeout(() => {
-        // Usa reload completo para garantir que o cookie esteja presente
         window.location.assign(redirectUrl || '/');
       }, 800);
     } catch (err: any) {
@@ -80,17 +77,16 @@ export default function LoginPage() {
         {/* Header */}
         <div className={styles.authHeader}>
           <div className={styles.authLogo}>
-            <Bug />
-            <h1 className={styles.authTitle}>Fazenda Santa Rita</h1>
+            <Coffee />
+            <h1 className={styles.authTitle}>Fazenda Café</h1>
           </div>
           <p className={styles.authSubtitle}>
-            Sistema de Monitoramento GPS - Cana-de-Açúcar
+            Sistema de Monitoramento GPS - Café
           </p>
         </div>
 
         {/* Body */}
         <div className={styles.authBody}>
-          {/* Alert de erro */}
           {error && (
             <div className={`${styles.alert} ${styles.alertError}`}>
               <AlertCircle />
@@ -98,7 +94,6 @@ export default function LoginPage() {
             </div>
           )}
 
-          {/* Alert de sucesso */}
           {success && (
             <div className={`${styles.alert} ${styles.alertSuccess}`}>
               <CheckCircle />

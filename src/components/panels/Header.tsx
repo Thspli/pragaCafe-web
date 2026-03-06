@@ -1,8 +1,8 @@
-// src/components/panels/Header.tsx (ATUALIZADO)
+// src/components/panels/Header.tsx
 "use client";
 
 import React, { useState } from "react";
-import { Bug, MapPin, Target, TrendingUp, BarChart3, User, LogOut, Settings, Bell, ChevronDown } from "lucide-react";
+import { Coffee, MapPin, Camera, TrendingUp, BarChart3, User, LogOut, Settings, Bell, ChevronDown } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
@@ -34,10 +34,9 @@ export function Header({
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
 
-  // Notificações mock (depois você integra com o backend)
   const notifications = [
     { id: 1, type: 'warning', message: 'Talhão 3 com infestação alta', time: '5 min' },
-    { id: 2, type: 'success', message: 'Nova armadilha cadastrada', time: '1h' },
+    { id: 2, type: 'success', message: 'Nova ponto de foto cadastrado', time: '1h' },
     { id: 3, type: 'info', message: 'Relatório mensal disponível', time: '3h' },
   ];
 
@@ -46,11 +45,11 @@ export function Header({
   return (
     <header
       style={{
-        background: "linear-gradient(135deg, rgba(21, 128, 61, 0.95) 0%, rgba(34, 197, 94, 0.95) 100%)",
+        background: "linear-gradient(135deg, rgba(44, 24, 16, 0.97) 0%, rgba(74, 44, 42, 0.97) 50%, rgba(139, 69, 19, 0.97) 100%)",
         backdropFilter: "blur(20px)",
         WebkitBackdropFilter: "blur(20px)",
-        borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
-        boxShadow: "0 8px 32px rgba(0, 0, 0, 0.1)",
+        borderBottom: "1px solid rgba(212, 168, 83, 0.2)",
+        boxShadow: "0 8px 32px rgba(0, 0, 0, 0.25)",
         position: "sticky",
         top: 0,
         zIndex: 1000,
@@ -73,15 +72,15 @@ export function Header({
         >
           <div
             style={{
-              background: "rgba(255, 255, 255, 0.15)",
+              background: "rgba(212, 168, 83, 0.15)",
               padding: "0.75rem",
               borderRadius: "1rem",
               display: "flex",
               backdropFilter: "blur(10px)",
-              border: "1px solid rgba(255, 255, 255, 0.2)",
+              border: "1px solid rgba(212, 168, 83, 0.3)",
             }}
           >
-            <Bug style={{ width: "2rem", height: "2rem", color: "white" }} />
+            <Coffee style={{ width: "2rem", height: "2rem", color: "#D4A853" }} />
           </div>
           <div>
             <h1
@@ -93,11 +92,11 @@ export function Header({
                 lineHeight: 1,
               }}
             >
-              Fazenda Santa Rita
+              Fazenda Café
             </h1>
             <p
               style={{
-                color: "rgba(255, 255, 255, 0.8)",
+                color: "rgba(212, 168, 83, 0.9)",
                 fontSize: "0.75rem",
                 marginTop: "0.25rem",
                 fontWeight: 500,
@@ -108,7 +107,7 @@ export function Header({
           </div>
         </motion.div>
 
-        {/* Stats Cards Compactos */}
+        {/* Stats Cards */}
         <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
           <StatCard
             icon={<MapPin size={18} />}
@@ -118,15 +117,15 @@ export function Header({
             delay={0.1}
           />
           <StatCard
-            icon={<Target size={18} />}
-            label="Armadilhas"
+            icon={<Camera size={18} />}
+            label="Pontos de Foto"
             value={totals.totalArmadilhas}
             onClick={onListaArmadilhas}
             delay={0.2}
           />
           <StatCard
-            icon={<Bug size={18} />}
-            label="Pragas"
+            icon={<Coffee size={18} />}
+            label="Brocas"
             value={totals.totalPragas}
             color="#ef4444"
             delay={0.3}
@@ -147,8 +146,8 @@ export function Header({
             whileTap={{ scale: 0.95 }}
             onClick={() => router.push('/dashboard')}
             style={{
-              background: "rgba(255, 255, 255, 0.15)",
-              border: "1px solid rgba(255, 255, 255, 0.2)",
+              background: "rgba(212, 168, 83, 0.15)",
+              border: "1px solid rgba(212, 168, 83, 0.3)",
               padding: "0.625rem 1rem",
               borderRadius: "0.75rem",
               cursor: "pointer",
@@ -173,8 +172,8 @@ export function Header({
               whileTap={{ scale: 0.95 }}
               onClick={() => setShowNotifications(!showNotifications)}
               style={{
-                background: "rgba(255, 255, 255, 0.15)",
-                border: "1px solid rgba(255, 255, 255, 0.2)",
+                background: "rgba(212, 168, 83, 0.15)",
+                border: "1px solid rgba(212, 168, 83, 0.3)",
                 padding: "0.625rem",
                 borderRadius: "0.75rem",
                 cursor: "pointer",
@@ -198,7 +197,7 @@ export function Header({
                     fontWeight: 700,
                     padding: "0.15rem 0.4rem",
                     borderRadius: "999px",
-                    border: "2px solid rgba(21, 128, 61, 0.95)",
+                    border: "2px solid rgba(44, 24, 16, 0.97)",
                   }}
                 >
                   {unreadNotifications}
@@ -206,7 +205,6 @@ export function Header({
               )}
             </motion.button>
 
-            {/* Notifications Dropdown */}
             <AnimatePresence>
               {showNotifications && (
                 <motion.div
@@ -252,7 +250,7 @@ export function Header({
                         cursor: "pointer",
                         transition: "background 0.2s",
                       }}
-                      onMouseEnter={(e) => (e.currentTarget.style.background = "#f9fafb")}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = "#fdf6f0")}
                       onMouseLeave={(e) => (e.currentTarget.style.background = "white")}
                     >
                       <div style={{ display: "flex", gap: "0.75rem", alignItems: "flex-start" }}>
@@ -263,9 +261,9 @@ export function Header({
                             borderRadius: "50%",
                             background:
                               notif.type === "warning"
-                                ? "#f59e0b"
+                                ? "#C8860A"
                                 : notif.type === "success"
-                                ? "#22c55e"
+                                ? "#8B4513"
                                 : "#3b82f6",
                             marginTop: "0.25rem",
                           }}
@@ -290,7 +288,7 @@ export function Header({
                       style={{
                         background: "transparent",
                         border: "none",
-                        color: "#15803d",
+                        color: "#4A2C2A",
                         fontSize: "0.875rem",
                         fontWeight: 600,
                         cursor: "pointer",
@@ -312,8 +310,8 @@ export function Header({
                 whileTap={{ scale: 0.98 }}
                 onClick={() => setShowUserMenu(!showUserMenu)}
                 style={{
-                  background: "rgba(255, 255, 255, 0.15)",
-                  border: "1px solid rgba(255, 255, 255, 0.2)",
+                  background: "rgba(212, 168, 83, 0.15)",
+                  border: "1px solid rgba(212, 168, 83, 0.3)",
                   padding: "0.5rem 0.875rem",
                   borderRadius: "0.75rem",
                   cursor: "pointer",
@@ -328,14 +326,14 @@ export function Header({
                     width: "32px",
                     height: "32px",
                     borderRadius: "50%",
-                    background: "linear-gradient(135deg, #3b82f6, #8b5cf6)",
+                    background: "linear-gradient(135deg, #8B4513, #C8860A)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     color: "white",
                     fontWeight: 700,
                     fontSize: "0.875rem",
-                    border: "2px solid rgba(255, 255, 255, 0.3)",
+                    border: "2px solid rgba(212, 168, 83, 0.4)",
                   }}
                 >
                   {user.nome.charAt(0).toUpperCase()}
@@ -356,7 +354,7 @@ export function Header({
                     style={{
                       margin: 0,
                       fontSize: "0.7rem",
-                      color: "rgba(255, 255, 255, 0.7)",
+                      color: "rgba(212, 168, 83, 0.9)",
                       marginTop: "0.125rem",
                     }}
                   >
@@ -366,14 +364,13 @@ export function Header({
                 <ChevronDown
                   size={16}
                   style={{
-                    color: "rgba(255, 255, 255, 0.8)",
+                    color: "rgba(212, 168, 83, 0.8)",
                     transition: "transform 0.2s",
                     transform: showUserMenu ? "rotate(180deg)" : "rotate(0deg)",
                   }}
                 />
               </motion.button>
 
-              {/* User Dropdown */}
               <AnimatePresence>
                 {showUserMenu && (
                   <motion.div
@@ -449,9 +446,9 @@ function StatCard({ icon, label, value, color, onClick, delay }: any) {
       whileHover={{ y: -4, scale: 1.05 }}
       onClick={onClick}
       style={{
-        background: "rgba(255, 255, 255, 0.15)",
+        background: "rgba(212, 168, 83, 0.12)",
         backdropFilter: "blur(10px)",
-        border: "1px solid rgba(255, 255, 255, 0.2)",
+        border: "1px solid rgba(212, 168, 83, 0.25)",
         padding: "0.75rem 1rem",
         borderRadius: "0.875rem",
         cursor: onClick ? "pointer" : "default",
@@ -463,14 +460,14 @@ function StatCard({ icon, label, value, color, onClick, delay }: any) {
         transition: "all 0.2s",
       }}
     >
-      <div style={{ color: color || "white", opacity: 0.9 }}>{icon}</div>
+      <div style={{ color: color || "#D4A853", opacity: 0.95 }}>{icon}</div>
       <div style={{ fontSize: "1.25rem", fontWeight: 700, color: "white", lineHeight: 1 }}>
         {value}
       </div>
       <div
         style={{
           fontSize: "0.7rem",
-          color: "rgba(255, 255, 255, 0.8)",
+          color: "rgba(212, 168, 83, 0.85)",
           fontWeight: 600,
           textTransform: "uppercase",
           letterSpacing: "0.5px",
@@ -501,7 +498,7 @@ function MenuItem({ icon, label, onClick, danger }: any) {
         transition: "background 0.2s",
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.background = danger ? "#fef2f2" : "#f9fafb";
+        e.currentTarget.style.background = danger ? "#fef2f2" : "#fdf6f0";
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.background = "transparent";
