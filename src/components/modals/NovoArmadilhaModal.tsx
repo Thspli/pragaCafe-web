@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Camera, MapPin, FileText, AlertCircle, CheckCircle, ZoomIn } from "lucide-react";
+import { X, Camera, MapPin, FileText, CheckCircle, ZoomIn } from "lucide-react";
 import { useToast } from "../ui/Toast";
 
 interface NovoArmadilhaModalProps {
@@ -18,7 +18,6 @@ interface NovoArmadilhaModalProps {
     observacao?: string;
     dataFoto?: string | null;
     foto?: string | null;
-    ausencia?: boolean;
     latitude: number;
     longitude: number;
     talhaoId: number;
@@ -32,7 +31,6 @@ export function NovoArmadilhaModal({
   const [nome, setNome] = useState("Ponto de Foto");
   const [observacao, setObservacao] = useState("");
   const [selectedFoto, setSelectedFoto] = useState<string | null>(null);
-  const [ausencia, setAusencia] = useState(false);
   const [loading, setLoading] = useState(false);
   const [fotosFromDb, setFotosFromDb] = useState<string[]>([]);
   const [existingId, setExistingId] = useState<number | null>(null);
@@ -48,7 +46,6 @@ export function NovoArmadilhaModal({
       setNome("Ponto de Foto");
       setObservacao("");
       setSelectedFoto(null);
-      setAusencia(false);
       setFotosFromDb([]);
       setExistingId(null);
       setPreviewUrl(null);
@@ -81,7 +78,6 @@ export function NovoArmadilhaModal({
           setExistingId(nearest.id);
           setNome(nearest.nome || "Ponto de Foto");
           setObservacao(nearest.observacao || "");
-          setAusencia(nearest.ausencia || false);
           if (nearest.foto) { setFotosFromDb([nearest.foto]); setSelectedFoto(nearest.foto); }
           else { setFotosFromDb([]); setSelectedFoto(null); }
         } else {
@@ -104,7 +100,7 @@ export function NovoArmadilhaModal({
     try {
       const payload: any = {
         nome: nome.trim(), observacao: observacao || undefined,
-        foto: selectedFoto || null, ausencia, latitude: lat, longitude: lng, talhaoId,
+        foto: selectedFoto || null, latitude: lat, longitude: lng, talhaoId,
       };
       if (existingId) payload.existingId = existingId;
       await onConfirm(payload);
@@ -219,7 +215,7 @@ export function NovoArmadilhaModal({
                   padding: "0.35rem 0.75rem", borderRadius: "0.5rem",
                   fontSize: "0.75rem", color: "#D4A853", fontWeight: 600,
                 }}>
-                  <AlertCircle size={12} />
+                  <CheckCircle size={12} />
                   Editando ponto existente (ID #{existingId})
                 </div>
               )}
@@ -340,54 +336,6 @@ export function NovoArmadilhaModal({
                     })}
                   </div>
                 )}
-              </div>
-
-              {/* Ausência toggle */}
-              <div style={{
-                display: "flex", alignItems: "center", justifyContent: "space-between",
-                padding: "1rem 1.125rem",
-                background: ausencia ? "rgba(220,38,38,0.06)" : "white",
-                border: `2px solid ${ausencia ? "rgba(220,38,38,0.2)" : "#e8ddd5"}`,
-                borderRadius: "0.875rem",
-                transition: "all 0.2s",
-                cursor: "pointer",
-                marginBottom: "0.25rem",
-              }}
-                onClick={() => setAusencia(a => !a)}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-                  <div style={{
-                    width: 36, height: 36, borderRadius: "0.625rem",
-                    background: ausencia ? "rgba(220,38,38,0.1)" : "#fdf6f0",
-                    border: `1.5px solid ${ausencia ? "rgba(220,38,38,0.25)" : "#e8ddd5"}`,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                  }}>
-                    <AlertCircle size={18} style={{ color: ausencia ? "#dc2626" : "#c9b5a8" }} />
-                  </div>
-                  <div>
-                    <div style={{ fontSize: "0.88rem", fontWeight: 700, color: ausencia ? "#dc2626" : "#2C1810" }}>
-                      Marcar como Ausência
-                    </div>
-                    <div style={{ fontSize: "0.75rem", color: "#9ca3af", marginTop: 2 }}>
-                      Sem broca detectada neste ponto
-                    </div>
-                  </div>
-                </div>
-                {/* Toggle pill */}
-                <div style={{
-                  width: 44, height: 24, borderRadius: 999,
-                  background: ausencia ? "#dc2626" : "#e8ddd5",
-                  position: "relative", transition: "background 0.2s", flexShrink: 0,
-                }}>
-                  <div style={{
-                    position: "absolute", top: 3,
-                    left: ausencia ? "calc(100% - 21px)" : 3,
-                    width: 18, height: 18, borderRadius: "50%",
-                    background: "white",
-                    boxShadow: "0 1px 4px rgba(0,0,0,0.2)",
-                    transition: "left 0.2s",
-                  }} />
-                </div>
               </div>
             </div>
 

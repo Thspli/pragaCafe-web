@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, ChevronLeft, ChevronRight, MapPin, Calendar, Camera, AlertCircle, CheckCircle } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, MapPin, Calendar, Camera } from "lucide-react";
 
 interface Armadilha {
   id: number;
@@ -11,7 +11,6 @@ interface Armadilha {
   observacao?: string;
   foto?: string;
   dataFoto?: string;
-  ausencia: boolean;
   latitude: number;
   longitude: number;
   talhaoId: number;
@@ -59,7 +58,7 @@ export function ListaArmadilhasModal({ open, onClose, talhoes, onArmadilhaClick 
         const data = await res.json();
         const unique = Array.from(new Map(data.map((a: any) => [a.id, a])).values()) as Armadilha[];
         setArmadilhas(unique.filter(a => a.latitude != null && a.longitude != null));
-      } catch (err) {
+      } catch {
         setArmadilhas([]);
       } finally {
         setLoading(false);
@@ -74,11 +73,11 @@ export function ListaArmadilhasModal({ open, onClose, talhoes, onArmadilhaClick 
 
   const getStatusColor = (status: string | null) => {
     switch (status) {
-      case "baixo": return { bg: "#fdf6f0", color: "#4A2C2A" };
-      case "medio": return { bg: "#fef3c7", color: "#92400e" };
-      case "alto":  return { bg: "#fed7aa", color: "#9a3412" };
+      case "baixo":   return { bg: "#fdf6f0", color: "#4A2C2A" };
+      case "medio":   return { bg: "#fef3c7", color: "#92400e" };
+      case "alto":    return { bg: "#fed7aa", color: "#9a3412" };
       case "critico": return { bg: "#fecaca", color: "#7f1d1d" };
-      default: return { bg: "#e5e7eb", color: "#374151" };
+      default:        return { bg: "#e5e7eb", color: "#374151" };
     }
   };
 
@@ -150,19 +149,15 @@ export function ListaArmadilhasModal({ open, onClose, talhoes, onArmadilhaClick 
                   {armadilhas.map((armadilha) => (
                     <motion.div key={armadilha.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileHover={{ scale: 1.02, y: -4 }}
                       onClick={() => { if (onArmadilhaClick) { onArmadilhaClick(armadilha); onClose(); } }}
-                      style={{ background: "linear-gradient(135deg, #ffffff 0%, #fdf6f0 100%)", border: armadilha.ausencia ? "2px solid #fca5a5" : "2px solid #D4A853", borderRadius: "0.75rem", padding: "1.5rem", cursor: onArmadilhaClick ? "pointer" : "default", boxShadow: "0 2px 8px rgba(0,0,0,0.05)", position: "relative", overflow: "hidden" }}
+                      style={{ background: "linear-gradient(135deg, #ffffff 0%, #fdf6f0 100%)", border: "2px solid #D4A853", borderRadius: "0.75rem", padding: "1.5rem", cursor: onArmadilhaClick ? "pointer" : "default", boxShadow: "0 2px 8px rgba(0,0,0,0.05)", position: "relative", overflow: "hidden" }}
                     >
-                      <div style={{ position: "absolute", top: -20, right: -20, width: 80, height: 80, background: armadilha.ausencia ? "radial-gradient(circle, rgba(239,68,68,0.08) 0%, transparent 70%)" : "radial-gradient(circle, rgba(200,134,10,0.08) 0%, transparent 70%)", borderRadius: "50%" }} />
+                      <div style={{ position: "absolute", top: -20, right: -20, width: 80, height: 80, background: "radial-gradient(circle, rgba(200,134,10,0.08) 0%, transparent 70%)", borderRadius: "50%" }} />
 
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1rem", paddingBottom: "1rem", borderBottom: "2px solid #f5e6d3" }}>
                         <h3 style={{ fontSize: "1.25rem", fontWeight: 700, color: "#2C1810", margin: 0, flex: 1 }}>
                           {armadilha.nome || 'Ponto de Foto'}
                         </h3>
                         <span style={{ fontSize: "0.75rem", color: "#C8860A", fontWeight: 700, background: "#fdf6f0", padding: "0.25rem 0.75rem", borderRadius: "0.5rem" }}>#{armadilha.id}</span>
-                      </div>
-
-                      <div style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem", padding: "0.5rem 1rem", borderRadius: "0.5rem", fontWeight: 700, fontSize: "0.8rem", background: armadilha.ausencia ? "#fee2e2" : "#fdf6f0", color: armadilha.ausencia ? "#991b1b" : "#4A2C2A", marginBottom: "1rem" }}>
-                        {armadilha.ausencia ? <><AlertCircle size={16} />Sem Foto</> : <><CheckCircle size={16} />Com Foto</>}
                       </div>
 
                       {armadilha.foto && (

@@ -4,7 +4,7 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  X, MapPin, Calendar, Camera, AlertCircle, CheckCircle,
+  X, MapPin, Calendar, Camera,
   Edit, Trash2, Save, XCircle, Clock, Navigation,
 } from "lucide-react";
 import { useToast } from "../ui/Toast";
@@ -17,7 +17,7 @@ interface ArmadilhaPanelProps {
 export function ArmadilhaPanel({ armadilha, onClose }: ArmadilhaPanelProps) {
   const [activeTab, setActiveTab] = useState<"info" | "foto" | "historico">("info");
   const [isEditing, setIsEditing] = useState(false);
-  const [editedData, setEditedData] = useState({ nome: "", observacao: "", ausencia: false });
+  const [editedData, setEditedData] = useState({ nome: "", observacao: "" });
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -29,7 +29,6 @@ export function ArmadilhaPanel({ armadilha, onClose }: ArmadilhaPanelProps) {
       setEditedData({
         nome: armadilha.nome || "",
         observacao: armadilha.observacao || "",
-        ausencia: armadilha.ausencia || false,
       });
     }
   }, [armadilha]);
@@ -52,7 +51,7 @@ export function ArmadilhaPanel({ armadilha, onClose }: ArmadilhaPanelProps) {
       const res = await fetch(`${API_URL}/armadilhas/${armadilha.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ nome: editedData.nome, observacao: editedData.observacao, ausencia: editedData.ausencia }),
+        body: JSON.stringify({ nome: editedData.nome, observacao: editedData.observacao }),
       });
       if (!res.ok) throw new Error();
       toast.success("Ponto atualizado!", "As alterações foram salvas com sucesso.");
@@ -97,7 +96,7 @@ export function ArmadilhaPanel({ armadilha, onClose }: ArmadilhaPanelProps) {
 
   const cancelEdit = () => {
     setIsEditing(false);
-    setEditedData({ nome: armadilha.nome || "", observacao: armadilha.observacao || "", ausencia: armadilha.ausencia || false });
+    setEditedData({ nome: armadilha.nome || "", observacao: armadilha.observacao || "" });
   };
 
   const inputStyle = (field: string): React.CSSProperties => ({
@@ -204,40 +203,6 @@ export function ArmadilhaPanel({ armadilha, onClose }: ArmadilhaPanelProps) {
               <X size={17} />
             </button>
           </div>
-
-          {/* Status / ausência toggle */}
-          {isEditing ? (
-            <div
-              onClick={() => setEditedData(d => ({ ...d, ausencia: !d.ausencia }))}
-              style={{
-                display: "inline-flex", alignItems: "center", gap: "0.625rem",
-                padding: "0.5rem 1rem", borderRadius: "0.75rem", cursor: "pointer",
-                background: editedData.ausencia ? "rgba(220,38,38,0.15)" : "rgba(139,69,19,0.15)",
-                border: `1.5px solid ${editedData.ausencia ? "rgba(220,38,38,0.3)" : "rgba(139,69,19,0.3)"}`,
-                transition: "all 0.2s",
-              }}
-            >
-              {editedData.ausencia
-                ? <AlertCircle size={16} style={{ color: "#fca5a5" }} />
-                : <CheckCircle size={16} style={{ color: "#D4A853" }} />}
-              <span style={{ fontSize: "0.82rem", fontWeight: 600, color: editedData.ausencia ? "#fca5a5" : "#D4A853" }}>
-                {editedData.ausencia ? "Ausência (clique para alternar)" : "Com Foto (clique para alternar)"}
-              </span>
-            </div>
-          ) : (
-            <div style={{
-              display: "inline-flex", alignItems: "center", gap: "0.5rem",
-              padding: "0.625rem 1.125rem", borderRadius: "0.75rem",
-              fontWeight: 700, fontSize: "0.875rem",
-              background: armadilha.ausencia ? "#fee2e2" : "#fdf6f0",
-              color: armadilha.ausencia ? "#991b1b" : "#4A2C2A",
-              border: `2px solid ${armadilha.ausencia ? "#fca5a5" : "#D4A853"}`,
-            }}>
-              {armadilha.ausencia
-                ? <><AlertCircle size={16} />Sem Foto / Ausência</>
-                : <><CheckCircle size={16} />Foto Registrada</>}
-            </div>
-          )}
         </div>
 
         {/* ── TABS ── */}

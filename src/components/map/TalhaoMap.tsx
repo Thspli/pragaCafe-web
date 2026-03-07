@@ -99,7 +99,6 @@ export function TalhaoMap({
     if (!scriptsLoaded || !mapContainerRef.current || mapInstanceRef.current) return;
     const L = (window as any).L;
 
-    // Centro padrão (fallback)
     const defaultCenter: [number, number] = [-22.028, -50.044];
 
     const initMap = (center: [number, number], zoom: number) => {
@@ -112,16 +111,10 @@ export function TalhaoMap({
       setTimeout(() => { map.invalidateSize(); setMapInitialized(true); }, 500);
     };
 
-    // Se não tem talhões, tenta usar a geolocalização do usuário
     if (talhoesLengthRef.current === 0 && navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          initMap([pos.coords.latitude, pos.coords.longitude], 16);
-        },
-        () => {
-          // Usuário negou ou erro — usa centro padrão
-          initMap(defaultCenter, 15);
-        },
+        (pos) => { initMap([pos.coords.latitude, pos.coords.longitude], 16); },
+        () => { initMap(defaultCenter, 15); },
         { timeout: 6000 }
       );
     } else {
@@ -228,31 +221,25 @@ export function TalhaoMap({
       const newLayers: any[] = [];
       unique.forEach((a: any) => {
         if (a.latitude == null || a.longitude == null) return;
-        const isAusencia = a.ausencia || false;
         const svg = `
           <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg" class="armadilha-marker-container">
             <ellipse cx="16" cy="37" rx="8" ry="2" fill="rgba(0,0,0,0.2)"/>
             <path d="M16 2C10.477 2 6 6.477 6 12C6 18.5 16 36 16 36C16 36 26 18.5 26 12C26 6.477 21.523 2 16 2Z"
-                  fill="${isAusencia ? "#94a3b8" : "#C8860A"}" stroke="#ffffff" stroke-width="2"/>
-            ${isAusencia
-              ? `<line x1="12" y1="10" x2="20" y2="18" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round"/>
-                 <line x1="20" y1="10" x2="12" y2="18" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round"/>`
-              : `<rect x="12" y="9" width="8" height="10" rx="1" fill="#ffffff" opacity="0.9"/>
-                 <circle cx="16" cy="14" r="2.5" fill="#C8860A"/>
-                 <line x1="16" y1="8" x2="16" y2="11" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round"/>`
-            }
+                  fill="#C8860A" stroke="#ffffff" stroke-width="2"/>
+            <rect x="12" y="9" width="8" height="10" rx="1" fill="#ffffff" opacity="0.9"/>
+            <circle cx="16" cy="14" r="2.5" fill="#C8860A"/>
+            <line x1="16" y1="8" x2="16" y2="11" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round"/>
           </svg>`;
         const aIcon = L.divIcon({ html: svg, className: "armadilha-icon", iconSize: [32, 40], iconAnchor: [16, 40], popupAnchor: [0, -40] });
         const amarker = L.marker([a.latitude, a.longitude], { icon: aIcon }).addTo(map);
         amarker.bindPopup(`
           <div style="min-width:180px;font-family:system-ui,sans-serif">
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-              <div style="width:10px;height:10px;border-radius:50%;background:${isAusencia ? "#94a3b8" : "#C8860A"}"></div>
+              <div style="width:10px;height:10px;border-radius:50%;background:#C8860A"></div>
               <strong style="font-size:14px;color:#2C1810">${a.nome || "Ponto de Foto"}</strong>
             </div>
             ${a.observacao ? `<div style="font-size:12px;color:#444;margin-bottom:6px">${a.observacao}</div>` : ""}
             <div style="font-size:11px;color:#666;display:flex;flex-direction:column;gap:4px;padding-top:6px;border-top:1px solid #e5e7eb">
-              <div><strong>Status:</strong> ${isAusencia ? "❌ Ausência" : "✅ Ativa"}</div>
               <div><strong>ID:</strong> #${a.id}</div>
             </div>
           </div>`);
@@ -396,7 +383,6 @@ export function TalhaoMap({
               background: "#22c55e",
               boxShadow: "0 0 6px #22c55e",
             }} />
-            {/* ✅ FIX: troca a palavra inteira em vez de appendar "ões" em "talhão" */}
             <span style={{ fontSize: "0.82rem", color: "rgba(212,168,83,0.8)", fontWeight: 600, letterSpacing: "0.04em" }}>
               {talhoes.length} {talhoes.length === 1 ? "talhão" : "talhões"}
             </span>
@@ -489,21 +475,10 @@ export function TalhaoMap({
 
 // ── MapToolButton ────────────────────────────────────────────────
 function MapToolButton({
-  active,
-  disabled,
-  onClick,
-  label,
-  emoji,
-  activeColor,
-  tooltip,
+  active, disabled, onClick, label, emoji, activeColor, tooltip,
 }: {
-  active: boolean;
-  disabled: boolean;
-  onClick: () => void;
-  label: string;
-  emoji: string;
-  activeColor: string;
-  tooltip: string;
+  active: boolean; disabled: boolean; onClick: () => void;
+  label: string; emoji: string; activeColor: string; tooltip: string;
 }) {
   const [hovered, setHovered] = useState(false);
 
@@ -523,17 +498,13 @@ function MapToolButton({
           : `1px solid ${hovered ? "rgba(212,168,83,0.4)" : "rgba(212,168,83,0.15)"}`,
         background: active
           ? activeColor
-          : hovered
-          ? "rgba(212,168,83,0.12)"
-          : "transparent",
+          : hovered ? "rgba(212,168,83,0.12)" : "transparent",
         color: active ? "#fff" : hovered ? "#D4A853" : "rgba(255,255,255,0.75)",
-        fontSize: "0.9rem",
-        fontWeight: 600,
+        fontSize: "0.9rem", fontWeight: 600,
         cursor: disabled ? "not-allowed" : "pointer",
         opacity: disabled ? 0.4 : 1,
         transition: "all 0.18s ease",
-        letterSpacing: "0.01em",
-        whiteSpace: "nowrap",
+        letterSpacing: "0.01em", whiteSpace: "nowrap",
       }}
     >
       <span style={{ fontSize: "1rem" }}>{emoji}</span>
