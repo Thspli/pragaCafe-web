@@ -91,18 +91,46 @@ export function TalhaoMap({
     };
   }, []);
 
+  const talhoesLengthRef = useRef(talhoes.length);
+  useEffect(() => { talhoesLengthRef.current = talhoes.length; }, [talhoes.length]);
+
   // 2. Inicializa mapa
   useEffect(() => {
     if (!scriptsLoaded || !mapContainerRef.current || mapInstanceRef.current) return;
     const L = (window as any).L;
-    const map = L.map(mapContainerRef.current, { center: [-22.028, -50.044], zoom: 15, zoomControl: true });
-    L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
-      attribution: "Tiles © Esri", maxZoom: 19,
-    }).addTo(map);
-    const drawnItems = L.featureGroup().addTo(map);
-    mapInstanceRef.current = { map, drawnItems, layers: [] };
-    setTimeout(() => { map.invalidateSize(); setMapInitialized(true); }, 500);
-    return () => { if (map) map.remove(); };
+
+    // Centro padrão (fallback)
+    const defaultCenter: [number, number] = [-22.028, -50.044];
+
+    const initMap = (center: [number, number], zoom: number) => {
+      const map = L.map(mapContainerRef.current, { center, zoom, zoomControl: true });
+      L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+        attribution: "Tiles © Esri", maxZoom: 19,
+      }).addTo(map);
+      const drawnItems = L.featureGroup().addTo(map);
+      mapInstanceRef.current = { map, drawnItems, layers: [] };
+      setTimeout(() => { map.invalidateSize(); setMapInitialized(true); }, 500);
+    };
+
+    // Se não tem talhões, tenta usar a geolocalização do usuário
+    if (talhoesLengthRef.current === 0 && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          initMap([pos.coords.latitude, pos.coords.longitude], 16);
+        },
+        () => {
+          // Usuário negou ou erro — usa centro padrão
+          initMap(defaultCenter, 15);
+        },
+        { timeout: 6000 }
+      );
+    } else {
+      initMap(defaultCenter, 15);
+    }
+
+    return () => {
+      if (mapInstanceRef.current?.map) mapInstanceRef.current.map.remove();
+    };
   }, [scriptsLoaded]);
 
   // 3. Sistema de desenho
@@ -368,8 +396,9 @@ export function TalhaoMap({
               background: "#22c55e",
               boxShadow: "0 0 6px #22c55e",
             }} />
+            {/* ✅ FIX: troca a palavra inteira em vez de appendar "ões" em "talhão" */}
             <span style={{ fontSize: "0.82rem", color: "rgba(212,168,83,0.8)", fontWeight: 600, letterSpacing: "0.04em" }}>
-              {talhoes.length} talhão{talhoes.length !== 1 ? "ões" : ""}
+              {talhoes.length} {talhoes.length === 1 ? "talhão" : "talhões"}
             </span>
           </div>
         )}

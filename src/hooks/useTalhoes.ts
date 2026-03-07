@@ -20,7 +20,6 @@ export interface Talhao {
   pragas: Praga[] | null;
 }
 
-// 🔥 Função helper para pegar o token
 const getAuthHeaders = () => {
   const token = localStorage.getItem('auth_token');
   return {
@@ -36,14 +35,13 @@ export function useTalhoes() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Função reutilizável para (re)carregar talhões
   const fetchTalhoes = async () => {
     try {
       setLoading(true);
       setError(null);
 
       const response = await fetch(`${API_URL}/talhoes`, {
-        headers: getAuthHeaders() // 🔥 Envia o token JWT
+        headers: getAuthHeaders()
       });
 
       if (!response.ok) {
@@ -79,7 +77,7 @@ export function useTalhoes() {
     try {
       const response = await fetch(`${API_URL}/talhoes`, {
         method: "POST",
-        headers: getAuthHeaders(), // 🔥 Envia o token JWT
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           nome: talhaoData.nome,
           area: talhaoData.area,
@@ -97,7 +95,7 @@ export function useTalhoes() {
         }
         throw new Error("Erro ao criar talhão");
       }
-      
+
       const novoTalhao = await response.json();
       setTalhoes(prev => [...prev, novoTalhao]);
       return novoTalhao;
@@ -108,14 +106,12 @@ export function useTalhoes() {
   };
 
   const getTotals = () => {
-    const safeTalhoes = talhoes.filter(t => 
-      t.totalPragas !== null && t.armadilhasAtivas !== null && t.area !== null
-    );
     return {
-      totalTalhoes: talhoes.length,
-      totalArmadilhas: safeTalhoes.reduce((acc, t) => acc + (t.armadilhasAtivas || 0), 0),
-      totalPragas: safeTalhoes.reduce((acc, t) => acc + (t.totalPragas || 0), 0),
-      areaTotal: safeTalhoes.reduce((acc, t) => acc + (t.area || 0), 0),
+      totalTalhoes:    talhoes.length,
+      // cada campo soma independentemente — um null em pragas não zera a área
+      totalArmadilhas: talhoes.reduce((acc, t) => acc + (t.armadilhasAtivas ?? 0), 0),
+      totalPragas:     talhoes.reduce((acc, t) => acc + (t.totalPragas     ?? 0), 0),
+      areaTotal:       talhoes.reduce((acc, t) => acc + (t.area            ?? 0), 0),
     };
   };
 
