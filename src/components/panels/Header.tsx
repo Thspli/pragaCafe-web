@@ -6,11 +6,13 @@ import {
   Coffee, MapPin, Camera, BarChart3,
   User, LogOut, Settings, Bell, ChevronDown, X,
   Leaf, Map, Phone, Mail, Edit2, Save, Lock, Globe,
-  Moon, Bell as BellIcon, Shield, Palette, Check
+  Bell as BellIcon, Shield, Palette, Check,
+  BellOff, Trash2, AlertTriangle, CheckCircle,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
+import { useNotificacoes, Notificacao } from "@/hooks/useNotificacoes";
 
 interface HeaderProps {
   totals: {
@@ -26,12 +28,6 @@ interface HeaderProps {
   onCreateTestTalhao: () => void;
 }
 
-const notifications = [
-  { id: 1, type: "warning", message: "Talhão 3 com infestação alta", time: "5 min" },
-  { id: 2, type: "success", message: "Novo ponto de foto cadastrado", time: "1h" },
-  { id: 3, type: "info",    message: "Relatório mensal disponível",   time: "3h" },
-];
-
 export function Header({
   totals,
   onListaTalhoes,
@@ -40,8 +36,13 @@ export function Header({
   const { user, logout } = useAuth();
   const router = useRouter();
 
-  const [userPanelOpen,  setUserPanelOpen]  = useState(false);
-  const [notifPanelOpen, setNotifPanelOpen] = useState(false);
+  const {
+    notificacoes, naoLidas, loading: notifLoading,
+    marcarComoLida, marcarTodasComoLidas, deletarNotificacao, limparTodas,
+  } = useNotificacoes();
+
+  const [userPanelOpen,   setUserPanelOpen]   = useState(false);
+  const [notifPanelOpen,  setNotifPanelOpen]  = useState(false);
   const [perfilModalOpen, setPerfilModalOpen] = useState(false);
   const [configModalOpen, setConfigModalOpen] = useState(false);
 
@@ -58,7 +59,7 @@ export function Header({
   }, []);
 
   const initials = user?.nome
-    ? user.nome.split(" ").map(w => w[0]).slice(0, 2).join("").toUpperCase()
+    ? user.nome.split(" ").map((w: string) => w[0]).slice(0, 2).join("").toUpperCase()
     : "?";
 
   return (
@@ -129,7 +130,7 @@ export function Header({
               Dashboard
             </motion.button>
 
-            {/* Notifications */}
+            {/* ── NOTIFICAÇÕES (reais) ── */}
             <div ref={notifRef} style={{ position: "relative" }}>
               <motion.button
                 whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.95 }}
@@ -142,17 +143,32 @@ export function Header({
                 }}
               >
                 <Bell size={20} />
-                <span style={{
-                  position: "absolute", top: -4, right: -4,
-                  background: "#ef4444", color: "#fff",
-                  fontSize: "0.65rem", fontWeight: 700,
-                  padding: "2px 6px", borderRadius: 999, border: "2px solid #1a0f0a",
-                }}>
-                  {notifications.length}
-                </span>
+                {naoLidas > 0 && (
+                  <span style={{
+                    position: "absolute", top: -4, right: -4,
+                    background: "#ef4444", color: "#fff",
+                    fontSize: "0.65rem", fontWeight: 700,
+                    padding: "2px 6px", borderRadius: 999, border: "2px solid #1a0f0a",
+                    minWidth: 18, textAlign: "center",
+                  }}>
+                    {naoLidas > 99 ? "99+" : naoLidas}
+                  </span>
+                )}
               </motion.button>
+
               <AnimatePresence>
-                {notifPanelOpen && <NotifDropdown onClose={() => setNotifPanelOpen(false)} />}
+                {notifPanelOpen && (
+                  <NotifDropdown
+                    notificacoes={notificacoes}
+                    naoLidas={naoLidas}
+                    loading={notifLoading}
+                    onClose={() => setNotifPanelOpen(false)}
+                    onMarcarLida={marcarComoLida}
+                    onMarcarTodas={marcarTodasComoLidas}
+                    onDeletar={deletarNotificacao}
+                    onLimparTodas={limparTodas}
+                  />
+                )}
               </AnimatePresence>
             </div>
 
@@ -326,18 +342,242 @@ export function Header({
   );
 }
 
-// ── MODAL PERFIL ─────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────
+// NOTIF DROPDOWN (notificações reais)
+// ─────────────────────────────────────────────────────────────────
+
+const TIPO_CONFIG: Record<string, { icon: React.ReactNode; color: string; bg: string }> = {
+  foto_tirada:         { icon: <Camera size={14} />,       color: "#C8860A", bg: "rgba(200,134,10,0.15)"  },
+  ponto_criado:        { icon: <MapPin size={14} />,        color: "#8B4513", bg: "rgba(139,69,19,0.15)"  },
+  ponto_atualizado:    { icon: <CheckCircle size={14} />,   color: "#3b82f6", bg: "rgba(59,130,246,0.15)" },
+  ponto_removido:      { icon: <X size={14} />,             color: "#ef4444", bg: "rgba(239,68,68,0.15)"  },
+  ausencia_registrada: { icon: <AlertTriangle size={14} />, color: "#f59e0b", bg: "rgba(245,158,11,0.15)" },
+  infestacao_alta:     { icon: <AlertTriangle size={14} />, color: "#ef4444", bg: "rgba(239,68,68,0.15)"  },
+  talhao_criado:       { icon: <MapPin size={14} />,        color: "#D4A853", bg: "rgba(212,168,83,0.15)" },
+  sistema:             { icon: <CheckCircle size={14} />,   color: "#6b7280", bg: "rgba(107,114,128,0.15)"},
+};
+
+function timeAgo(dateStr: string) {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const min  = Math.floor(diff / 60000);
+  if (min < 1)  return "agora";
+  if (min < 60) return `${min}min atrás`;
+  const h = Math.floor(min / 60);
+  if (h < 24)   return `${h}h atrás`;
+  return `${Math.floor(h / 24)}d atrás`;
+}
+
+interface NotifDropdownProps {
+  notificacoes: Notificacao[];
+  naoLidas: number;
+  loading: boolean;
+  onClose: () => void;
+  onMarcarLida: (id: number) => void;
+  onMarcarTodas: () => void;
+  onDeletar: (id: number) => void;
+  onLimparTodas: () => void;
+}
+
+function NotifDropdown({
+  notificacoes, naoLidas, loading,
+  onClose, onMarcarLida, onMarcarTodas, onDeletar, onLimparTodas,
+}: NotifDropdownProps) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -8, scale: 0.96 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -8, scale: 0.96 }}
+      transition={{ type: "spring", stiffness: 380, damping: 28 }}
+      style={{
+        position: "absolute", top: "calc(100% + 12px)", right: 0, width: 360,
+        background: "#1a0f0a",
+        border: "1px solid rgba(212,168,83,0.2)",
+        borderRadius: "1rem",
+        boxShadow: "0 20px 48px rgba(0,0,0,0.55)",
+        overflow: "hidden", zIndex: 2100,
+        maxHeight: "80vh", display: "flex", flexDirection: "column",
+      }}
+    >
+      {/* Header */}
+      <div style={{
+        padding: "1rem 1.25rem 0.875rem",
+        borderBottom: "1px solid rgba(212,168,83,0.12)",
+        display: "flex", justifyContent: "space-between", alignItems: "center",
+        flexShrink: 0,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.625rem" }}>
+          <span style={{ fontWeight: 700, color: "#fff", fontSize: "0.95rem" }}>Notificações</span>
+          {naoLidas > 0 && (
+            <span style={{
+              fontSize: "0.72rem", background: "#ef4444", color: "#fff",
+              padding: "2px 8px", borderRadius: 999, fontWeight: 700,
+            }}>
+              {naoLidas}
+            </span>
+          )}
+        </div>
+        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+          {naoLidas > 0 && (
+            <button onClick={onMarcarTodas} style={{
+              background: "rgba(212,168,83,0.1)", border: "1px solid rgba(212,168,83,0.2)",
+              borderRadius: "0.5rem", padding: "0.3rem 0.6rem",
+              color: "#D4A853", fontSize: "0.72rem", fontWeight: 600,
+              cursor: "pointer", display: "flex", alignItems: "center", gap: "0.3rem",
+            }}>
+              <Check size={11} /> Ler todas
+            </button>
+          )}
+          {notificacoes.length > 0 && (
+            <button onClick={onLimparTodas} style={{
+              background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.15)",
+              borderRadius: "0.5rem", padding: "0.3rem 0.6rem",
+              color: "#f87171", fontSize: "0.72rem", fontWeight: 600,
+              cursor: "pointer", display: "flex", alignItems: "center", gap: "0.3rem",
+            }}>
+              <Trash2 size={11} /> Limpar
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Lista */}
+      <div style={{ overflowY: "auto", flex: 1 }}>
+        {loading && notificacoes.length === 0 ? (
+          <div style={{ padding: "2rem", textAlign: "center", color: "rgba(212,168,83,0.4)" }}>
+            <div style={{
+              width: 20, height: 20, borderRadius: "50%",
+              border: "2px solid rgba(212,168,83,0.15)", borderTop: "2px solid #D4A853",
+              animation: "spin 0.8s linear infinite", margin: "0 auto 0.75rem",
+            }} />
+            Carregando…
+          </div>
+        ) : notificacoes.length === 0 ? (
+          <div style={{ padding: "2.5rem 1.5rem", textAlign: "center" }}>
+            <BellOff size={36} style={{ color: "rgba(212,168,83,0.2)", margin: "0 auto 0.75rem", display: "block" }} />
+            <p style={{ color: "rgba(212,168,83,0.4)", fontSize: "0.875rem", margin: 0 }}>
+              Nenhuma notificação
+            </p>
+          </div>
+        ) : (
+          <AnimatePresence initial={false}>
+            {notificacoes.map((n) => {
+              const cfg = TIPO_CONFIG[n.tipo] ?? TIPO_CONFIG["sistema"];
+              return (
+                <motion.div
+                  key={n.id}
+                  layout
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.18 }}
+                  onClick={() => !n.lida && onMarcarLida(n.id)}
+                  style={{
+                    padding: "0.875rem 1.25rem",
+                    borderBottom: "1px solid rgba(255,255,255,0.04)",
+                    display: "flex", gap: "0.75rem", alignItems: "flex-start",
+                    background: n.lida ? "transparent" : "rgba(212,168,83,0.04)",
+                    cursor: n.lida ? "default" : "pointer",
+                    position: "relative", transition: "background 0.15s",
+                  }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(212,168,83,0.07)"; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = n.lida ? "transparent" : "rgba(212,168,83,0.04)"; }}
+                >
+                  {/* ponto não-lida */}
+                  {!n.lida && (
+                    <div style={{
+                      position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)",
+                      width: 5, height: 5, borderRadius: "50%",
+                      background: "#D4A853", boxShadow: "0 0 6px #D4A85388",
+                    }} />
+                  )}
+
+                  {/* ícone tipo */}
+                  <div style={{
+                    width: 32, height: 32, borderRadius: "0.625rem", flexShrink: 0,
+                    background: cfg.bg, border: `1px solid ${cfg.color}33`,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    color: cfg.color, marginTop: 1,
+                  }}>
+                    {cfg.icon}
+                  </div>
+
+                  {/* conteúdo */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{
+                      fontSize: "0.84rem",
+                      fontWeight: n.lida ? 500 : 700,
+                      color: n.lida ? "rgba(255,255,255,0.55)" : "rgba(255,255,255,0.9)",
+                      lineHeight: 1.35, marginBottom: "0.2rem",
+                    }}>
+                      {n.titulo}
+                    </div>
+                    {n.mensagem && (
+                      <div style={{ fontSize: "0.75rem", color: "rgba(212,168,83,0.5)", lineHeight: 1.4, marginBottom: "0.25rem" }}>
+                        {n.mensagem}
+                      </div>
+                    )}
+                    {n.metadados?.talhaoNome && (
+                      <div style={{
+                        display: "inline-flex", alignItems: "center", gap: "0.25rem",
+                        fontSize: "0.68rem", color: "rgba(212,168,83,0.45)",
+                        background: "rgba(212,168,83,0.07)", padding: "1px 6px",
+                        borderRadius: 999, marginBottom: "0.25rem",
+                      }}>
+                        <MapPin size={9} /> {n.metadados.talhaoNome}
+                      </div>
+                    )}
+                    <div style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.25)" }}>
+                      {timeAgo(n.criadoEm)}
+                    </div>
+                  </div>
+
+                  {/* botão deletar */}
+                  <button
+                    onClick={e => { e.stopPropagation(); onDeletar(n.id); }}
+                    style={{
+                      background: "transparent", border: "none", cursor: "pointer",
+                      color: "rgba(255,255,255,0.15)", padding: "2px", flexShrink: 0,
+                      display: "flex", alignItems: "center", borderRadius: "4px", transition: "color 0.15s",
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.color = "#ef4444"; }}
+                    onMouseLeave={e => { e.currentTarget.style.color = "rgba(255,255,255,0.15)"; }}
+                  >
+                    <X size={13} />
+                  </button>
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
+        )}
+      </div>
+
+      <div style={{
+        padding: "0.625rem 1.25rem", flexShrink: 0,
+        borderTop: "1px solid rgba(212,168,83,0.08)", textAlign: "center",
+      }}>
+        <span style={{ fontSize: "0.72rem", color: "rgba(212,168,83,0.3)" }}>
+          Atualiza a cada 15 segundos
+        </span>
+      </div>
+
+      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+    </motion.div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// MODAL PERFIL
+// ─────────────────────────────────────────────────────────────────
 function PerfilModal({ user, initials, onClose }: { user: any; initials: string; onClose: () => void }) {
-  const [editing, setEditing] = useState(false);
-  const [nome, setNome] = useState(user.nome || "");
-  const [telefone, setTelefone] = useState(user.telefone || "");
-  const [fazenda, setFazenda] = useState(user.fazenda || "");
-  const [saving, setSaving] = useState(false);
+  const [editing, setEditing]         = useState(false);
+  const [nome, setNome]               = useState(user.nome || "");
+  const [telefone, setTelefone]       = useState(user.telefone || "");
+  const [fazenda, setFazenda]         = useState(user.fazenda || "");
+  const [saving, setSaving]           = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
 
   const handleSave = async () => {
     setSaving(true);
-    // Simula salvamento — conectar ao endpoint de update quando disponível
     await new Promise(r => setTimeout(r, 900));
     setSaving(false);
     setEditing(false);
@@ -345,8 +585,7 @@ function PerfilModal({ user, initials, onClose }: { user: any; initials: string;
 
   const inputStyle = (field: string): React.CSSProperties => ({
     width: "100%", padding: "0.75rem 1rem",
-    fontSize: "0.9rem", fontWeight: 500,
-    background: "white",
+    fontSize: "0.9rem", fontWeight: 500, background: "white",
     border: `2px solid ${focusedField === field ? "#8B4513" : "#e8ddd5"}`,
     borderRadius: "0.875rem", color: "#2C1810", outline: "none",
     transition: "border-color 0.2s, box-shadow 0.2s",
@@ -366,55 +605,26 @@ function PerfilModal({ user, initials, onClose }: { user: any; initials: string;
       }}
     >
       <motion.div
-        initial={{ opacity: 0, scale: 0.93, y: 28 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
+        initial={{ opacity: 0, scale: 0.93, y: 28 }} animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.93, y: 28 }}
         transition={{ type: "spring", stiffness: 360, damping: 30 }}
         onClick={e => e.stopPropagation()}
-        style={{
-          width: "100%", maxWidth: 500, borderRadius: "1.5rem", overflow: "hidden",
-          boxShadow: "0 40px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(212,168,83,0.15)",
-        }}
+        style={{ width: "100%", maxWidth: 500, borderRadius: "1.5rem", overflow: "hidden", boxShadow: "0 40px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(212,168,83,0.15)" }}
       >
-        {/* Header */}
-        <div style={{
-          background: "linear-gradient(135deg, #1a0f0a 0%, #2C1810 60%, #3d1f12 100%)",
-          padding: "2rem", position: "relative", overflow: "hidden",
-        }}>
-          <div style={{
-            position: "absolute", top: -50, right: -30, width: 180, height: 180,
-            background: "radial-gradient(circle, rgba(212,168,83,0.1) 0%, transparent 70%)",
-            pointerEvents: "none",
-          }} />
+        <div style={{ background: "linear-gradient(135deg, #1a0f0a 0%, #2C1810 60%, #3d1f12 100%)", padding: "2rem", position: "relative", overflow: "hidden" }}>
+          <div style={{ position: "absolute", top: -50, right: -30, width: 180, height: 180, background: "radial-gradient(circle, rgba(212,168,83,0.1) 0%, transparent 70%)", pointerEvents: "none" }} />
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", position: "relative" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "1.25rem" }}>
-              <div style={{
-                width: 64, height: 64, borderRadius: "50%",
-                background: "linear-gradient(135deg, #8B4513, #C8860A)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                color: "#fff", fontWeight: 700, fontSize: "1.4rem",
-                border: "3px solid rgba(212,168,83,0.5)",
-                boxShadow: "0 6px 20px rgba(139,69,19,0.4)",
-              }}>
+              <div style={{ width: 64, height: 64, borderRadius: "50%", background: "linear-gradient(135deg, #8B4513, #C8860A)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700, fontSize: "1.4rem", border: "3px solid rgba(212,168,83,0.5)", boxShadow: "0 6px 20px rgba(139,69,19,0.4)" }}>
                 {initials}
               </div>
               <div>
-                <div style={{ fontSize: "0.7rem", fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(212,168,83,0.55)", marginBottom: "0.3rem" }}>
-                  Meu Perfil
-                </div>
-                <h2 style={{ margin: 0, fontSize: "1.4rem", fontWeight: 700, color: "#fff", lineHeight: 1.2 }}>
-                  {user.nome.split(" ")[0]}
-                </h2>
+                <div style={{ fontSize: "0.7rem", fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(212,168,83,0.55)", marginBottom: "0.3rem" }}>Meu Perfil</div>
+                <h2 style={{ margin: 0, fontSize: "1.4rem", fontWeight: 700, color: "#fff", lineHeight: 1.2 }}>{user.nome.split(" ")[0]}</h2>
                 <div style={{ fontSize: "0.8rem", color: "rgba(212,168,83,0.6)", marginTop: 3 }}>{user.email}</div>
               </div>
             </div>
-            <button
-              onClick={onClose}
-              style={{
-                width: 38, height: 38, display: "flex", alignItems: "center", justifyContent: "center",
-                background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
-                borderRadius: "0.625rem", cursor: "pointer", color: "rgba(255,255,255,0.5)", transition: "all 0.2s",
-              }}
+            <button onClick={onClose} style={{ width: 38, height: 38, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "0.625rem", cursor: "pointer", color: "rgba(255,255,255,0.5)", transition: "all 0.2s" }}
               onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.12)"; e.currentTarget.style.color = "#fff"; }}
               onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; e.currentTarget.style.color = "rgba(255,255,255,0.5)"; }}
             >
@@ -423,103 +633,52 @@ function PerfilModal({ user, initials, onClose }: { user: any; initials: string;
           </div>
         </div>
 
-        {/* Body */}
         <div style={{ background: "#fdf8f3", padding: "1.75rem 2rem" }}>
           <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-            {/* Nome */}
             <div>
               <label style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#6b4c3a", marginBottom: "0.5rem" }}>
                 <User size={11} style={{ color: "#8B4513" }} />Nome completo
               </label>
-              <input value={nome} onChange={e => setNome(e.target.value)}
-                disabled={!editing}
-                onFocus={() => setFocusedField("nome")} onBlur={() => setFocusedField(null)}
-                style={inputStyle("nome")} />
+              <input value={nome} onChange={e => setNome(e.target.value)} disabled={!editing}
+                onFocus={() => setFocusedField("nome")} onBlur={() => setFocusedField(null)} style={inputStyle("nome")} />
             </div>
-
-            {/* Email (somente leitura) */}
             <div>
               <label style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#6b4c3a", marginBottom: "0.5rem" }}>
                 <Mail size={11} style={{ color: "#8B4513" }} />E-mail
               </label>
-              <input value={user.email} disabled
-                style={{ ...inputStyle("email"), opacity: 0.5, cursor: "not-allowed" }} />
+              <input value={user.email} disabled style={{ ...inputStyle("email"), opacity: 0.5, cursor: "not-allowed" }} />
             </div>
-
-            {/* Telefone */}
             <div>
               <label style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#6b4c3a", marginBottom: "0.5rem" }}>
                 <Phone size={11} style={{ color: "#8B4513" }} />Telefone <span style={{ fontSize: "0.65rem", color: "#c9b5a8", fontWeight: 500, letterSpacing: 0, textTransform: "none" }}>(opcional)</span>
               </label>
-              <input value={telefone} onChange={e => setTelefone(e.target.value)}
-                disabled={!editing} placeholder="(00) 00000-0000"
-                onFocus={() => setFocusedField("tel")} onBlur={() => setFocusedField(null)}
-                style={inputStyle("tel")} />
+              <input value={telefone} onChange={e => setTelefone(e.target.value)} disabled={!editing} placeholder="(00) 00000-0000"
+                onFocus={() => setFocusedField("tel")} onBlur={() => setFocusedField(null)} style={inputStyle("tel")} />
             </div>
-
-            {/* Fazenda */}
             <div>
               <label style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#6b4c3a", marginBottom: "0.5rem" }}>
                 <Map size={11} style={{ color: "#8B4513" }} />Fazenda
               </label>
-              <input value={fazenda} onChange={e => setFazenda(e.target.value)}
-                disabled={!editing} placeholder="Nome da fazenda"
-                onFocus={() => setFocusedField("faz")} onBlur={() => setFocusedField(null)}
-                style={inputStyle("faz")} />
+              <input value={fazenda} onChange={e => setFazenda(e.target.value)} disabled={!editing} placeholder="Nome da fazenda"
+                onFocus={() => setFocusedField("faz")} onBlur={() => setFocusedField(null)} style={inputStyle("faz")} />
             </div>
           </div>
         </div>
 
-        {/* Footer */}
-        <div style={{
-          background: "#fdf8f3", borderTop: "1px solid #ede4da",
-          padding: "1.25rem 2rem 1.5rem", display: "flex", gap: "0.75rem",
-        }}>
+        <div style={{ background: "#fdf8f3", borderTop: "1px solid #ede4da", padding: "1.25rem 2rem 1.5rem", display: "flex", gap: "0.75rem" }}>
           {editing ? (
             <>
-              <button onClick={() => setEditing(false)} disabled={saving}
-                style={{
-                  flex: 1, padding: "0.9rem", background: "white", border: "2px solid #e8ddd5",
-                  borderRadius: "0.875rem", color: "#6b4c3a", fontWeight: 600, fontSize: "0.9rem",
-                  cursor: "pointer", transition: "all 0.18s",
-                }}>
-                Cancelar
-              </button>
-              <motion.button onClick={handleSave} disabled={saving}
-                whileHover={!saving ? { scale: 1.02, y: -1 } : {}}
-                whileTap={!saving ? { scale: 0.98 } : {}}
-                style={{
-                  flex: 2, padding: "0.9rem", border: "none", borderRadius: "0.875rem",
-                  color: "white", fontWeight: 700, fontSize: "0.95rem", cursor: saving ? "not-allowed" : "pointer",
-                  background: saving ? "#c9b5a8" : "linear-gradient(135deg, #3d1f12 0%, #8B4513 60%, #a05220 100%)",
-                  boxShadow: saving ? "none" : "0 4px 16px rgba(139,69,19,0.35)",
-                  display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem",
-                }}>
-                {saving ? (
-                  <><div style={{ width: 16, height: 16, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTop: "2px solid #fff", animation: "spin 0.8s linear infinite" }} />Salvando…</>
-                ) : (
-                  <><Save size={16} />Salvar Alterações</>
-                )}
+              <button onClick={() => setEditing(false)} disabled={saving} style={{ flex: 1, padding: "0.9rem", background: "white", border: "2px solid #e8ddd5", borderRadius: "0.875rem", color: "#6b4c3a", fontWeight: 600, fontSize: "0.9rem", cursor: "pointer" }}>Cancelar</button>
+              <motion.button onClick={handleSave} disabled={saving} whileHover={!saving ? { scale: 1.02, y: -1 } : {}} whileTap={!saving ? { scale: 0.98 } : {}}
+                style={{ flex: 2, padding: "0.9rem", border: "none", borderRadius: "0.875rem", color: "white", fontWeight: 700, fontSize: "0.95rem", cursor: saving ? "not-allowed" : "pointer", background: saving ? "#c9b5a8" : "linear-gradient(135deg, #3d1f12 0%, #8B4513 60%, #a05220 100%)", boxShadow: saving ? "none" : "0 4px 16px rgba(139,69,19,0.35)", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem" }}>
+                {saving ? (<><div style={{ width: 16, height: 16, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTop: "2px solid #fff", animation: "spin 0.8s linear infinite" }} />Salvando…</>) : (<><Save size={16} />Salvar Alterações</>)}
               </motion.button>
             </>
           ) : (
             <>
-              <button onClick={onClose}
-                style={{
-                  flex: 1, padding: "0.9rem", background: "white", border: "2px solid #e8ddd5",
-                  borderRadius: "0.875rem", color: "#6b4c3a", fontWeight: 600, fontSize: "0.9rem", cursor: "pointer",
-                }}>
-                Fechar
-              </button>
-              <motion.button onClick={() => setEditing(true)}
-                whileHover={{ scale: 1.02, y: -1 }} whileTap={{ scale: 0.98 }}
-                style={{
-                  flex: 2, padding: "0.9rem", border: "none", borderRadius: "0.875rem",
-                  color: "white", fontWeight: 700, fontSize: "0.95rem", cursor: "pointer",
-                  background: "linear-gradient(135deg, #3d1f12 0%, #8B4513 60%, #a05220 100%)",
-                  boxShadow: "0 4px 16px rgba(139,69,19,0.35)",
-                  display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem",
-                }}>
+              <button onClick={onClose} style={{ flex: 1, padding: "0.9rem", background: "white", border: "2px solid #e8ddd5", borderRadius: "0.875rem", color: "#6b4c3a", fontWeight: 600, fontSize: "0.9rem", cursor: "pointer" }}>Fechar</button>
+              <motion.button onClick={() => setEditing(true)} whileHover={{ scale: 1.02, y: -1 }} whileTap={{ scale: 0.98 }}
+                style={{ flex: 2, padding: "0.9rem", border: "none", borderRadius: "0.875rem", color: "white", fontWeight: 700, fontSize: "0.95rem", cursor: "pointer", background: "linear-gradient(135deg, #3d1f12 0%, #8B4513 60%, #a05220 100%)", boxShadow: "0 4px 16px rgba(139,69,19,0.35)", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem" }}>
                 <Edit2 size={16} />Editar Perfil
               </motion.button>
             </>
@@ -531,12 +690,14 @@ function PerfilModal({ user, initials, onClose }: { user: any; initials: string;
   );
 }
 
-// ── MODAL CONFIGURAÇÕES ──────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────
+// MODAL CONFIGURAÇÕES
+// ─────────────────────────────────────────────────────────────────
 function ConfigModal({ onClose }: { onClose: () => void }) {
-  const [notifications, setNotifications] = useState(true);
-  const [darkMap, setDarkMap] = useState(true);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [darkMap, setDarkMap]   = useState(true);
   const [language, setLanguage] = useState("pt-BR");
-  const [saved, setSaved] = useState(false);
+  const [saved, setSaved]       = useState(false);
 
   const handleSave = async () => {
     setSaved(true);
@@ -549,99 +710,45 @@ function ConfigModal({ onClose }: { onClose: () => void }) {
     <motion.div
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       onClick={onClose}
-      style={{
-        position: "fixed", inset: 0, zIndex: 3500,
-        background: "rgba(10,5,2,0.75)", backdropFilter: "blur(8px)",
-        display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem",
-      }}
+      style={{ position: "fixed", inset: 0, zIndex: 3500, background: "rgba(10,5,2,0.75)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}
     >
       <motion.div
-        initial={{ opacity: 0, scale: 0.93, y: 28 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
+        initial={{ opacity: 0, scale: 0.93, y: 28 }} animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.93, y: 28 }}
         transition={{ type: "spring", stiffness: 360, damping: 30 }}
         onClick={e => e.stopPropagation()}
-        style={{
-          width: "100%", maxWidth: 500, borderRadius: "1.5rem", overflow: "hidden",
-          boxShadow: "0 40px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(212,168,83,0.15)",
-        }}
+        style={{ width: "100%", maxWidth: 500, borderRadius: "1.5rem", overflow: "hidden", boxShadow: "0 40px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(212,168,83,0.15)" }}
       >
-        {/* Header */}
-        <div style={{
-          background: "linear-gradient(135deg, #1a0f0a 0%, #2C1810 60%, #3d1f12 100%)",
-          padding: "1.25rem 1.5rem", position: "relative", overflow: "hidden",
-        }}>
-          <div style={{
-            position: "absolute", top: -50, right: -30, width: 180, height: 180,
-            background: "radial-gradient(circle, rgba(212,168,83,0.1) 0%, transparent 70%)",
-            pointerEvents: "none",
-          }} />
+        <div style={{ background: "linear-gradient(135deg, #1a0f0a 0%, #2C1810 60%, #3d1f12 100%)", padding: "1.25rem 1.5rem", position: "relative", overflow: "hidden" }}>
+          <div style={{ position: "absolute", top: -50, right: -30, width: 180, height: 180, background: "radial-gradient(circle, rgba(212,168,83,0.1) 0%, transparent 70%)", pointerEvents: "none" }} />
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", position: "relative" }}>
             <div>
               <h2 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 700, color: "#fff", lineHeight: 1.2, display: "flex", alignItems: "center", gap: "0.5rem" }}>
                 <Settings size={18} style={{ color: "#D4A853" }} />Configurações
               </h2>
-              <p style={{ margin: "0.2rem 0 0", fontSize: "0.75rem", color: "rgba(212,168,83,0.5)" }}>
-                Preferências e ajustes do sistema
-              </p>
+              <p style={{ margin: "0.2rem 0 0", fontSize: "0.75rem", color: "rgba(212,168,83,0.5)" }}>Preferências e ajustes do sistema</p>
             </div>
-            <button onClick={onClose}
-              style={{
-                width: 38, height: 38, display: "flex", alignItems: "center", justifyContent: "center",
-                background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
-                borderRadius: "0.625rem", cursor: "pointer", color: "rgba(255,255,255,0.5)", transition: "all 0.2s",
-              }}
+            <button onClick={onClose} style={{ width: 38, height: 38, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "0.625rem", cursor: "pointer", color: "rgba(255,255,255,0.5)", transition: "all 0.2s" }}
               onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.12)"; e.currentTarget.style.color = "#fff"; }}
               onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; e.currentTarget.style.color = "rgba(255,255,255,0.5)"; }}
-            >
-              <X size={17} />
-            </button>
+            ><X size={17} /></button>
           </div>
         </div>
 
-        {/* Body */}
         <div style={{ background: "#fdf8f3", padding: "1rem 1.5rem", display: "flex", flexDirection: "column", gap: "0.5rem", maxHeight: "50vh", overflowY: "auto" }}>
-
-          {/* Seção Notificações */}
           <ConfigSection title="Notificações" icon={<BellIcon size={14} style={{ color: "#8B4513" }} />}>
-            <ConfigToggle
-              label="Alertas de infestação"
-              description="Receber avisos quando brocas ultrapassarem limite"
-              value={notifications}
-              onChange={setNotifications}
-            />
+            <ConfigToggle label="Alertas de infestação" description="Receber avisos quando brocas ultrapassarem limite" value={notificationsEnabled} onChange={setNotificationsEnabled} />
           </ConfigSection>
-
-          {/* Seção Mapa */}
           <ConfigSection title="Mapa" icon={<Palette size={14} style={{ color: "#8B4513" }} />}>
-            <ConfigToggle
-              label="Mapa escuro (satélite)"
-              description="Usar imagem de satélite como fundo do mapa"
-              value={darkMap}
-              onChange={setDarkMap}
-            />
+            <ConfigToggle label="Mapa escuro (satélite)" description="Usar imagem de satélite como fundo do mapa" value={darkMap} onChange={setDarkMap} />
           </ConfigSection>
-
-          {/* Seção Idioma */}
           <ConfigSection title="Idioma" icon={<Globe size={14} style={{ color: "#8B4513" }} />}>
             <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-              {[
-                { value: "pt-BR", label: "🇧🇷 Português (Brasil)" },
-                { value: "es",    label: "🇪🇸 Español" },
-                { value: "en",    label: "🇺🇸 English" },
-              ].map(opt => {
+              {[{ value: "pt-BR", label: "🇧🇷 Português (Brasil)" }, { value: "es", label: "🇪🇸 Español" }, { value: "en", label: "🇺🇸 English" }].map(opt => {
                 const sel = language === opt.value;
                 return (
                   <button key={opt.value} onClick={() => setLanguage(opt.value)}
-                    style={{
-                      display: "flex", alignItems: "center", justifyContent: "space-between",
-                      padding: "0.75rem 1rem",
-                      background: sel ? "rgba(139,69,19,0.08)" : "white",
-                      border: `2px solid ${sel ? "#8B4513" : "#e8ddd5"}`,
-                      borderRadius: "0.75rem", cursor: "pointer", transition: "all 0.18s",
-                      fontSize: "0.88rem", fontWeight: sel ? 700 : 500,
-                      color: sel ? "#4A2C2A" : "#6b4c3a",
-                    }}>
+                    style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0.75rem 1rem", background: sel ? "rgba(139,69,19,0.08)" : "white", border: `2px solid ${sel ? "#8B4513" : "#e8ddd5"}`, borderRadius: "0.75rem", cursor: "pointer", transition: "all 0.18s", fontSize: "0.88rem", fontWeight: sel ? 700 : 500, color: sel ? "#4A2C2A" : "#6b4c3a" }}>
                     {opt.label}
                     {sel && <Check size={16} style={{ color: "#8B4513" }} />}
                   </button>
@@ -649,18 +756,8 @@ function ConfigModal({ onClose }: { onClose: () => void }) {
               })}
             </div>
           </ConfigSection>
-
-          {/* Seção Segurança */}
           <ConfigSection title="Segurança" icon={<Shield size={14} style={{ color: "#8B4513" }} />}>
-            <button
-              style={{
-                width: "100%", padding: "0.875rem 1rem",
-                display: "flex", alignItems: "center", gap: "0.75rem",
-                background: "white", border: "2px solid #e8ddd5",
-                borderRadius: "0.875rem", cursor: "pointer",
-                fontSize: "0.88rem", fontWeight: 600, color: "#4A2C2A",
-                transition: "all 0.18s",
-              }}
+            <button style={{ width: "100%", padding: "0.875rem 1rem", display: "flex", alignItems: "center", gap: "0.75rem", background: "white", border: "2px solid #e8ddd5", borderRadius: "0.875rem", cursor: "pointer", fontSize: "0.88rem", fontWeight: 600, color: "#4A2C2A", transition: "all 0.18s" }}
               onMouseEnter={e => { e.currentTarget.style.borderColor = "#8B4513"; e.currentTarget.style.background = "rgba(139,69,19,0.04)"; }}
               onMouseLeave={e => { e.currentTarget.style.borderColor = "#e8ddd5"; e.currentTarget.style.background = "white"; }}
             >
@@ -671,30 +768,10 @@ function ConfigModal({ onClose }: { onClose: () => void }) {
           </ConfigSection>
         </div>
 
-        {/* Footer */}
-        <div style={{
-          background: "#fdf8f3", borderTop: "1px solid #ede4da",
-          padding: "0.875rem 1.5rem", display: "flex", gap: "0.75rem",
-        }}>
-          <button onClick={onClose}
-            style={{
-              flex: 1, padding: "0.75rem", background: "white", border: "2px solid #e8ddd5",
-              borderRadius: "0.875rem", color: "#6b4c3a", fontWeight: 600, fontSize: "0.875rem", cursor: "pointer",
-            }}>
-            Fechar
-          </button>
-          <motion.button onClick={handleSave}
-            whileHover={{ scale: 1.02, y: -1 }} whileTap={{ scale: 0.98 }}
-            style={{
-              flex: 2, padding: "0.75rem", border: "none", borderRadius: "0.875rem",
-              color: "white", fontWeight: 700, fontSize: "0.875rem", cursor: "pointer",
-              background: saved
-                ? "linear-gradient(135deg, #15803d, #16a34a)"
-                : "linear-gradient(135deg, #3d1f12 0%, #8B4513 60%, #a05220 100%)",
-              boxShadow: "0 4px 16px rgba(139,69,19,0.35)",
-              display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem",
-              transition: "background 0.3s",
-            }}>
+        <div style={{ background: "#fdf8f3", borderTop: "1px solid #ede4da", padding: "0.875rem 1.5rem", display: "flex", gap: "0.75rem" }}>
+          <button onClick={onClose} style={{ flex: 1, padding: "0.75rem", background: "white", border: "2px solid #e8ddd5", borderRadius: "0.875rem", color: "#6b4c3a", fontWeight: 600, fontSize: "0.875rem", cursor: "pointer" }}>Fechar</button>
+          <motion.button onClick={handleSave} whileHover={{ scale: 1.02, y: -1 }} whileTap={{ scale: 0.98 }}
+            style={{ flex: 2, padding: "0.75rem", border: "none", borderRadius: "0.875rem", color: "white", fontWeight: 700, fontSize: "0.875rem", cursor: "pointer", background: saved ? "linear-gradient(135deg, #15803d, #16a34a)" : "linear-gradient(135deg, #3d1f12 0%, #8B4513 60%, #a05220 100%)", boxShadow: "0 4px 16px rgba(139,69,19,0.35)", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem", transition: "background 0.3s" }}>
             {saved ? <><Check size={16} />Salvo!</> : <><Save size={16} />Salvar</>}
           </motion.button>
         </div>
@@ -717,35 +794,23 @@ function ConfigSection({ title, icon, children }: { title: string; icon: React.R
 
 function ConfigToggle({ label, description, value, onChange }: { label: string; description: string; value: boolean; onChange: (v: boolean) => void }) {
   return (
-    <div
-      onClick={() => onChange(!value)}
-      style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "0.5rem 0.625rem",
-        background: value ? "rgba(139,69,19,0.05)" : "#fdf8f3",
-        border: `2px solid ${value ? "rgba(139,69,19,0.15)" : "#f0e6dd"}`,
-        borderRadius: "0.75rem", cursor: "pointer", transition: "all 0.2s",
-      }}
+    <div onClick={() => onChange(!value)}
+      style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0.5rem 0.625rem", background: value ? "rgba(139,69,19,0.05)" : "#fdf8f3", border: `2px solid ${value ? "rgba(139,69,19,0.15)" : "#f0e6dd"}`, borderRadius: "0.75rem", cursor: "pointer", transition: "all 0.2s" }}
     >
       <div>
         <div style={{ fontSize: "0.88rem", fontWeight: 600, color: "#2C1810" }}>{label}</div>
         <div style={{ fontSize: "0.75rem", color: "#9b8070", marginTop: 2 }}>{description}</div>
       </div>
-      <div style={{
-        width: 44, height: 24, borderRadius: 999, position: "relative",
-        background: value ? "#8B4513" : "#e8ddd5", transition: "background 0.2s", flexShrink: 0, marginLeft: "1rem",
-      }}>
-        <div style={{
-          position: "absolute", top: 3, left: value ? "calc(100% - 21px)" : 3,
-          width: 18, height: 18, borderRadius: "50%", background: "white",
-          boxShadow: "0 1px 4px rgba(0,0,0,0.2)", transition: "left 0.2s",
-        }} />
+      <div style={{ width: 44, height: 24, borderRadius: 999, position: "relative", background: value ? "#8B4513" : "#e8ddd5", transition: "background 0.2s", flexShrink: 0, marginLeft: "1rem" }}>
+        <div style={{ position: "absolute", top: 3, left: value ? "calc(100% - 21px)" : 3, width: 18, height: 18, borderRadius: "50%", background: "white", boxShadow: "0 1px 4px rgba(0,0,0,0.2)", transition: "left 0.2s" }} />
       </div>
     </div>
   );
 }
 
-// ── SUB-COMPONENTS ────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────
+// SUB-COMPONENTS
+// ─────────────────────────────────────────────────────────────────
 function StatPill({ icon, label, value, accent, onClick, delay }: {
   icon: React.ReactNode; label: string; value: string | number;
   accent?: string; onClick?: () => void; delay?: number;
@@ -755,62 +820,11 @@ function StatPill({ icon, label, value, accent, onClick, delay }: {
       initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: delay ?? 0 }}
       whileHover={onClick ? { y: -2, scale: 1.04 } : {}}
       onClick={onClick}
-      style={{
-        display: "flex", alignItems: "center", gap: "0.5rem",
-        padding: "0.55rem 1rem",
-        background: "rgba(255,255,255,0.05)", border: "1px solid rgba(212,168,83,0.18)",
-        borderRadius: "0.75rem", cursor: onClick ? "pointer" : "default",
-        backdropFilter: "blur(6px)", transition: "all 0.2s", userSelect: "none",
-      }}
+      style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.55rem 1rem", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(212,168,83,0.18)", borderRadius: "0.75rem", cursor: onClick ? "pointer" : "default", backdropFilter: "blur(6px)", transition: "all 0.2s", userSelect: "none" }}
     >
       <span style={{ color: accent || "#D4A853", opacity: 0.9 }}>{icon}</span>
       <span style={{ fontSize: "1.1rem", fontWeight: 700, color: accent || "#fff", lineHeight: 1 }}>{value}</span>
-      <span style={{ fontSize: "0.72rem", color: "rgba(212,168,83,0.65)", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.04em" }}>
-        {label}
-      </span>
-    </motion.div>
-  );
-}
-
-function NotifDropdown({ onClose }: { onClose: () => void }) {
-  const notifs = [
-    { id: 1, type: "warning", message: "Talhão 3 com infestação alta", time: "5 min" },
-    { id: 2, type: "success", message: "Novo ponto de foto cadastrado", time: "1h" },
-    { id: 3, type: "info",    message: "Relatório mensal disponível",   time: "3h" },
-  ];
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: -8, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: -8, scale: 0.96 }} transition={{ type: "spring", stiffness: 380, damping: 28 }}
-      style={{
-        position: "absolute", top: "calc(100% + 12px)", right: 0, width: 320,
-        background: "#1e1008", border: "1px solid rgba(212,168,83,0.2)",
-        borderRadius: "1rem", boxShadow: "0 16px 40px rgba(0,0,0,0.45)", overflow: "hidden", zIndex: 2100,
-      }}
-    >
-      <div style={{ padding: "1rem 1.25rem", borderBottom: "1px solid rgba(212,168,83,0.12)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ fontWeight: 700, color: "#fff", fontSize: "1rem" }}>Notificações</span>
-        <span style={{ fontSize: "0.75rem", background: "rgba(212,168,83,0.15)", color: "#D4A853", padding: "3px 10px", borderRadius: 999, fontWeight: 600 }}>
-          {notifs.length} novas
-        </span>
-      </div>
-      {notifs.map(n => (
-        <div key={n.id} style={{ padding: "0.875rem 1.25rem", borderBottom: "1px solid rgba(255,255,255,0.05)", display: "flex", gap: "0.875rem", alignItems: "flex-start", cursor: "pointer", transition: "background 0.15s" }}
-          onMouseEnter={e => (e.currentTarget.style.background = "rgba(212,168,83,0.06)")}
-          onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
-        >
-          <div style={{ width: 9, height: 9, borderRadius: "50%", marginTop: 5, flexShrink: 0, background: n.type === "warning" ? "#C8860A" : n.type === "success" ? "#8B4513" : "#3b82f6" }} />
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: "0.875rem", color: "rgba(255,255,255,0.85)", fontWeight: 500, lineHeight: 1.4 }}>{n.message}</div>
-            <div style={{ fontSize: "0.75rem", color: "rgba(212,168,83,0.55)", marginTop: 3 }}>{n.time} atrás</div>
-          </div>
-        </div>
-      ))}
-      <div style={{ padding: "0.75rem 1.25rem", textAlign: "center" }}>
-        <button onClick={onClose} style={{ background: "transparent", border: "none", color: "#D4A853", fontSize: "0.875rem", fontWeight: 600, cursor: "pointer" }}>
-          Ver todas →
-        </button>
-      </div>
+      <span style={{ fontSize: "0.72rem", color: "rgba(212,168,83,0.65)", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.04em" }}>{label}</span>
     </motion.div>
   );
 }
@@ -818,22 +832,12 @@ function NotifDropdown({ onClose }: { onClose: () => void }) {
 function PanelMenuItem({ icon, label, description, onClick }: { icon: React.ReactNode; label: string; description: string; onClick: () => void }) {
   return (
     <motion.button
-      whileHover={{ x: 4 }}
-      onClick={onClick}
-      style={{
-        width: "100%", display: "flex", alignItems: "center", gap: "1rem",
-        padding: "0.875rem 1rem", background: "transparent",
-        border: "1px solid transparent", borderRadius: "0.875rem",
-        cursor: "pointer", textAlign: "left", marginBottom: "0.375rem", transition: "all 0.2s",
-      }}
+      whileHover={{ x: 4 }} onClick={onClick}
+      style={{ width: "100%", display: "flex", alignItems: "center", gap: "1rem", padding: "0.875rem 1rem", background: "transparent", border: "1px solid transparent", borderRadius: "0.875rem", cursor: "pointer", textAlign: "left", marginBottom: "0.375rem", transition: "all 0.2s" }}
       onMouseEnter={e => { e.currentTarget.style.background = "rgba(212,168,83,0.08)"; e.currentTarget.style.borderColor = "rgba(212,168,83,0.15)"; }}
       onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = "transparent"; }}
     >
-      <div style={{
-        width: 42, height: 42, borderRadius: "0.75rem",
-        background: "rgba(212,168,83,0.1)", border: "1px solid rgba(212,168,83,0.2)",
-        display: "flex", alignItems: "center", justifyContent: "center", color: "#D4A853", flexShrink: 0,
-      }}>
+      <div style={{ width: 42, height: 42, borderRadius: "0.75rem", background: "rgba(212,168,83,0.1)", border: "1px solid rgba(212,168,83,0.2)", display: "flex", alignItems: "center", justifyContent: "center", color: "#D4A853", flexShrink: 0 }}>
         {icon}
       </div>
       <div>

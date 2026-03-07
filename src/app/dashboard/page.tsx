@@ -7,12 +7,14 @@ import {
   TrendingUp, TrendingDown, Coffee, Camera, MapPin,
   Calendar, AlertTriangle, CheckCircle, Activity,
   BarChart3, PieChart as PieChartIcon, ArrowLeft,
+  Bell, BellOff,
 } from "lucide-react";
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
 import { useTalhoes } from "@/hooks/useTalhoes";
+import { useNotificacoes, Notificacao } from "@/hooks/useNotificacoes";
 
 // ── Paleta ────────────────────────────────────────────────────────
 const C = {
@@ -54,9 +56,34 @@ const DarkTooltip = ({ active, payload, label }: any) => {
   );
 };
 
+// ── Ícone e cor por tipo de notificação ───────────────────────────
+function getNotifStyle(tipo: string): { icon: React.ReactNode; color: string } {
+  switch (tipo) {
+    case "foto_tirada":         return { icon: <Camera size={16} />,        color: C.caramel };
+    case "ponto_criado":        return { icon: <MapPin size={16} />,         color: C.brown   };
+    case "ponto_atualizado":    return { icon: <CheckCircle size={16} />,    color: C.blue    };
+    case "ponto_removido":      return { icon: <AlertTriangle size={16} />,  color: C.red     };
+    case "ausencia_registrada": return { icon: <AlertTriangle size={16} />,  color: C.caramel };
+    case "infestacao_alta":     return { icon: <AlertTriangle size={16} />,  color: C.red     };
+    case "talhao_criado":       return { icon: <MapPin size={16} />,         color: C.gold    };
+    default:                    return { icon: <Bell size={16} />,           color: C.gold    };
+  }
+}
+
+function timeAgo(dateStr: string) {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const min  = Math.floor(diff / 60000);
+  if (min < 1)  return "agora";
+  if (min < 60) return `${min}min atrás`;
+  const h = Math.floor(min / 60);
+  if (h < 24)   return `${h}h atrás`;
+  return `${Math.floor(h / 24)}d atrás`;
+}
+
 export default function DashboardPage() {
-  const { talhoes, loading } = useTalhoes();
-  const [selectedPeriod, setSelectedPeriod] = useState<"week" | "month" | "year">("month");
+  const { talhoes, loading }                      = useTalhoes();
+  const { notificacoes, loading: notifLoading }   = useNotificacoes();
+  const [selectedPeriod, setSelectedPeriod]       = useState<"week" | "month" | "year">("month");
 
   const pragasHistorico = [
     { mes: "Jan", brocas: 120, pontos: 45 },
@@ -81,20 +108,19 @@ export default function DashboardPage() {
 
   const totals = {
     totalTalhoes:    talhoes.length,
-    totalPragas:     talhoes.reduce((acc, t) => acc + (t.totalPragas     || 0), 0),
+    totalPragas:     talhoes.reduce((acc, t) => acc + (t.totalPragas      || 0), 0),
     totalArmadilhas: talhoes.reduce((acc, t) => acc + (t.armadilhasAtivas || 0), 0),
-    areaTotal:       talhoes.reduce((acc, t) => acc + (t.area             || 0), 0),
+    areaTotal:       talhoes.reduce((acc, t) => acc + (t.area              || 0), 0),
   };
+
+  // pega as 5 notificações mais recentes para "Atividades Recentes"
+  const atividadesRecentes = notificacoes.slice(0, 5);
 
   if (loading) {
     return (
       <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: C.bg }}>
         <div style={{ textAlign: "center" }}>
-          <div style={{
-            width: 40, height: 40, border: `3px solid ${C.border}`,
-            borderTop: `3px solid ${C.gold}`, borderRadius: "50%",
-            margin: "0 auto 1rem", animation: "spin 1s linear infinite",
-          }} />
+          <div style={{ width: 40, height: 40, border: `3px solid ${C.border}`, borderTop: `3px solid ${C.gold}`, borderRadius: "50%", margin: "0 auto 1rem", animation: "spin 1s linear infinite" }} />
           <p style={{ color: C.goldDim, fontWeight: 600 }}>Carregando dashboard…</p>
         </div>
         <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
@@ -128,17 +154,9 @@ export default function DashboardPage() {
 
           <motion.h1
             initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }}
-            style={{
-              fontSize: "2rem", fontWeight: 700, color: C.text,
-              margin: 0, display: "flex", alignItems: "center", gap: "0.75rem",
-            }}
+            style={{ fontSize: "2rem", fontWeight: 700, color: C.text, margin: 0, display: "flex", alignItems: "center", gap: "0.75rem" }}
           >
-            <div style={{
-              width: 44, height: 44, borderRadius: "0.875rem",
-              background: "linear-gradient(135deg, rgba(212,168,83,0.15), rgba(200,134,10,0.08))",
-              border: `1px solid ${C.border}`,
-              display: "flex", alignItems: "center", justifyContent: "center",
-            }}>
+            <div style={{ width: 44, height: 44, borderRadius: "0.875rem", background: "linear-gradient(135deg, rgba(212,168,83,0.15), rgba(200,134,10,0.08))", border: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
               <BarChart3 size={24} style={{ color: C.gold }} />
             </div>
             Dashboard Analytics
@@ -149,28 +167,19 @@ export default function DashboardPage() {
         </div>
 
         {/* Period selector */}
-        <div style={{
-          display: "flex", gap: "0.25rem",
-          background: C.surface, padding: "0.25rem",
-          borderRadius: "0.875rem", border: `1px solid ${C.border}`,
-          alignSelf: "flex-start",
-        }}>
+        <div style={{ display: "flex", gap: "0.25rem", background: C.surface, padding: "0.25rem", borderRadius: "0.875rem", border: `1px solid ${C.border}`, alignSelf: "flex-start" }}>
           {(["week", "month", "year"] as const).map(period => {
             const active = selectedPeriod === period;
             return (
-              <button
-                key={period}
-                onClick={() => setSelectedPeriod(period)}
+              <button key={period} onClick={() => setSelectedPeriod(period)}
                 style={{
                   padding: "0.5rem 1.125rem",
                   background: active ? "linear-gradient(135deg, #3d1f12, #8B4513)" : "transparent",
                   color: active ? "#fff" : C.textDim,
-                  border: "none", borderRadius: "0.625rem",
-                  cursor: "pointer", fontSize: "0.82rem", fontWeight: 600,
-                  transition: "all 0.2s",
+                  border: "none", borderRadius: "0.625rem", cursor: "pointer",
+                  fontSize: "0.82rem", fontWeight: 600, transition: "all 0.2s",
                   boxShadow: active ? "0 4px 12px rgba(139,69,19,0.35)" : "none",
-                }}
-              >
+                }}>
                 {period === "week" ? "Semana" : period === "month" ? "Mês" : "Ano"}
               </button>
             );
@@ -180,27 +189,26 @@ export default function DashboardPage() {
 
       {/* ── KPI CARDS ── */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "1rem", marginBottom: "1.75rem" }}>
-        <KPICard icon={<MapPin size={22} />}   label="Total de Talhões" value={totals.totalTalhoes}                  trend={null} accent={C.blue}    delay={0}    />
-        <KPICard icon={<Coffee size={22} />}   label="Total de Brocas"  value={totals.totalPragas}                   trend={-12}  accent={C.red}     delay={0.07} />
-        <KPICard icon={<Camera size={22} />}   label="Pontos de Foto"   value={totals.totalArmadilhas}               trend={+8}   accent={C.brown}   delay={0.14} />
-        <KPICard icon={<Activity size={22} />} label="Área Total"       value={`${totals.areaTotal.toFixed(1)} ha`}  trend={null} accent={C.caramel} delay={0.21} />
+        <KPICard icon={<MapPin size={22} />}   label="Total de Talhões" value={totals.totalTalhoes}                 trend={null} accent={C.blue}    delay={0}    />
+        <KPICard icon={<Coffee size={22} />}   label="Total de Brocas"  value={totals.totalPragas}                  trend={-12}  accent={C.red}     delay={0.07} />
+        <KPICard icon={<Camera size={22} />}   label="Pontos de Foto"   value={totals.totalArmadilhas}              trend={+8}   accent={C.brown}   delay={0.14} />
+        <KPICard icon={<Activity size={22} />} label="Área Total"       value={`${totals.areaTotal.toFixed(1)} ha`} trend={null} accent={C.caramel} delay={0.21} />
       </div>
 
       {/* ── CHARTS ROW 1 ── */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(380px, 1fr))", gap: "1rem", marginBottom: "1rem" }}>
 
-        {/* Evolução */}
         <ChartCard title="Evolução de Brocas" subtitle="Últimos 6 meses" icon={<TrendingUp size={18} />}>
           <ResponsiveContainer width="100%" height={260}>
             <AreaChart data={pragasHistorico}>
               <defs>
                 <linearGradient id="gBrocas" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%"  stopColor={C.red}   stopOpacity={0.25} />
-                  <stop offset="95%" stopColor={C.red}   stopOpacity={0}    />
+                  <stop offset="5%"  stopColor={C.red}  stopOpacity={0.25} />
+                  <stop offset="95%" stopColor={C.red}  stopOpacity={0}    />
                 </linearGradient>
                 <linearGradient id="gPontos" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%"  stopColor={C.gold}  stopOpacity={0.2}  />
-                  <stop offset="95%" stopColor={C.gold}  stopOpacity={0}    />
+                  <stop offset="5%"  stopColor={C.gold} stopOpacity={0.2} />
+                  <stop offset="95%" stopColor={C.gold} stopOpacity={0}   />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(212,168,83,0.08)" />
@@ -214,18 +222,12 @@ export default function DashboardPage() {
           </ResponsiveContainer>
         </ChartCard>
 
-        {/* Distribuição */}
         <ChartCard title="Status dos Talhões" subtitle="Distribuição atual" icon={<PieChartIcon size={18} />}>
           <ResponsiveContainer width="100%" height={260}>
             <PieChart>
-              <Pie
-                data={statusDistribution}
-                cx="50%" cy="50%"
-                labelLine={false}
+              <Pie data={statusDistribution} cx="50%" cy="50%" labelLine={false}
                 label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                outerRadius={95}
-                dataKey="value"
-              >
+                outerRadius={95} dataKey="value">
                 {statusDistribution.map((entry, i) => (
                   <Cell key={i} fill={entry.color} stroke="rgba(0,0,0,0.3)" strokeWidth={2} />
                 ))}
@@ -256,47 +258,47 @@ export default function DashboardPage() {
         </ResponsiveContainer>
       </ChartCard>
 
-      {/* ── ATIVIDADES ── */}
+      {/* ── ATIVIDADES RECENTES (notificações reais) ── */}
       <motion.div
         initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}
-        style={{
-          background: C.surface, borderRadius: "1rem",
-          padding: "1.5rem", border: `1px solid ${C.border}`,
-        }}
+        style={{ background: C.surface, borderRadius: "1rem", padding: "1.5rem", border: `1px solid ${C.border}` }}
       >
-        <h3 style={{
-          fontSize: "0.95rem", fontWeight: 700, color: C.text,
-          marginBottom: "1.125rem", display: "flex", alignItems: "center", gap: "0.5rem",
-        }}>
+        <h3 style={{ fontSize: "0.95rem", fontWeight: 700, color: C.text, marginBottom: "1.125rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
           <Calendar size={18} style={{ color: C.gold }} />
           Atividades Recentes
         </h3>
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-          <ActivityItem
-            icon={<CheckCircle size={16} style={{ color: C.brown }} />}
-            title="Novo ponto de foto cadastrado"
-            description="Talhão 3 — Setor Norte"
-            time="5 min atrás"
-          />
-          <ActivityItem
-            icon={<AlertTriangle size={16} style={{ color: C.caramel }} />}
-            title="Alerta de infestação média"
-            description="Talhão 7 — Verificar pontos de foto"
-            time="1h atrás"
-          />
-          <ActivityItem
-            icon={<Coffee size={16} style={{ color: C.red }} />}
-            title="Pico de brocas detectado"
-            description="Talhão 2 — 45 brocas identificadas"
-            time="3h atrás"
-          />
-          <ActivityItem
-            icon={<CheckCircle size={16} style={{ color: C.brown }} />}
-            title="Relatório mensal gerado"
-            description="Maio 2025 — Download disponível"
-            time="1 dia atrás"
-          />
-        </div>
+
+        {notifLoading && atividadesRecentes.length === 0 ? (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "2rem", gap: "0.75rem" }}>
+            <div style={{ width: 18, height: 18, borderRadius: "50%", border: `2px solid ${C.border}`, borderTop: `2px solid ${C.gold}`, animation: "spin 0.8s linear infinite" }} />
+            <span style={{ color: C.goldDim, fontSize: "0.875rem" }}>Carregando atividades…</span>
+          </div>
+        ) : atividadesRecentes.length === 0 ? (
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "2.5rem", gap: "0.75rem" }}>
+            <BellOff size={36} style={{ color: "rgba(212,168,83,0.2)" }} />
+            <p style={{ color: C.textMuted, fontSize: "0.875rem", margin: 0 }}>Nenhuma atividade registrada ainda</p>
+            <p style={{ color: C.textDim, fontSize: "0.78rem", margin: 0 }}>As atividades aparecerão aqui quando o app registrar pontos ou fotos</p>
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+            {atividadesRecentes.map((n: Notificacao) => {
+              const { icon, color } = getNotifStyle(n.tipo);
+              return (
+                <NotifActivityItem
+                  key={n.id}
+                  icon={React.cloneElement(icon as React.ReactElement, { style: { color } })}
+                  title={n.titulo}
+                  description={
+                    [n.mensagem, n.metadados?.talhaoNome ? `Talhão: ${n.metadados.talhaoNome}` : null]
+                      .filter(Boolean).join(" — ") || ""
+                  }
+                  time={timeAgo(n.criadoEm)}
+                  lida={n.lida}
+                />
+              );
+            })}
+          </div>
+        )}
       </motion.div>
 
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
@@ -314,46 +316,23 @@ function KPICard({ icon, label, value, trend, accent, delay }: {
     <motion.div
       initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay }}
       whileHover={{ y: -4, scale: 1.015 }}
-      style={{
-        background: C.surface, borderRadius: "1rem",
-        padding: "1.375rem 1.5rem",
-        border: `1px solid ${C.border}`,
-        boxShadow: "0 4px 20px rgba(0,0,0,0.3)",
-        transition: "border-color 0.2s",
-        cursor: "default",
-      }}
+      style={{ background: C.surface, borderRadius: "1rem", padding: "1.375rem 1.5rem", border: `1px solid ${C.border}`, boxShadow: "0 4px 20px rgba(0,0,0,0.3)", transition: "border-color 0.2s", cursor: "default" }}
       onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = C.borderHov; }}
       onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = C.border;    }}
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.125rem" }}>
-        <div style={{
-          width: 42, height: 42, borderRadius: "0.75rem",
-          background: `${accent}18`,
-          border: `1px solid ${accent}30`,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          color: accent,
-        }}>
+        <div style={{ width: 42, height: 42, borderRadius: "0.75rem", background: `${accent}18`, border: `1px solid ${accent}30`, display: "flex", alignItems: "center", justifyContent: "center", color: accent }}>
           {icon}
         </div>
         {trend !== null && (
-          <div style={{
-            display: "flex", alignItems: "center", gap: "0.25rem",
-            fontSize: "0.78rem", fontWeight: 700,
-            color: trend > 0 ? C.brown : C.red,
-            background: trend > 0 ? "rgba(139,69,19,0.12)" : "rgba(239,68,68,0.1)",
-            padding: "0.25rem 0.625rem", borderRadius: "999px",
-          }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.25rem", fontSize: "0.78rem", fontWeight: 700, color: trend > 0 ? C.brown : C.red, background: trend > 0 ? "rgba(139,69,19,0.12)" : "rgba(239,68,68,0.1)", padding: "0.25rem 0.625rem", borderRadius: "999px" }}>
             {trend > 0 ? <TrendingUp size={13} /> : <TrendingDown size={13} />}
             {Math.abs(trend)}%
           </div>
         )}
       </div>
-      <div style={{ fontSize: "2rem", fontWeight: 700, color: C.text, lineHeight: 1, marginBottom: "0.375rem" }}>
-        {value}
-      </div>
-      <div style={{ fontSize: "0.78rem", color: C.textMuted, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em" }}>
-        {label}
-      </div>
+      <div style={{ fontSize: "2rem", fontWeight: 700, color: C.text, lineHeight: 1, marginBottom: "0.375rem" }}>{value}</div>
+      <div style={{ fontSize: "0.78rem", color: C.textMuted, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em" }}>{label}</div>
     </motion.div>
   );
 }
@@ -365,11 +344,7 @@ function ChartCard({ title, subtitle, icon, children, style: extraStyle }: {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-      style={{
-        background: C.surface, borderRadius: "1rem",
-        padding: "1.5rem", border: `1px solid ${C.border}`,
-        ...extraStyle,
-      }}
+      style={{ background: C.surface, borderRadius: "1rem", padding: "1.5rem", border: `1px solid ${C.border}`, ...extraStyle }}
     >
       <div style={{ marginBottom: "1.375rem" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.2rem" }}>
@@ -383,36 +358,40 @@ function ChartCard({ title, subtitle, icon, children, style: extraStyle }: {
   );
 }
 
-function ActivityItem({ icon, title, description, time }: {
-  icon: React.ReactNode; title: string; description: string; time: string;
+function NotifActivityItem({ icon, title, description, time, lida }: {
+  icon: React.ReactNode; title: string; description: string; time: string; lida: boolean;
 }) {
   return (
     <div
       style={{
         display: "flex", gap: "0.875rem", padding: "0.875rem 1rem",
-        background: C.surface2, borderRadius: "0.75rem",
-        border: `1px solid ${C.border}`,
-        transition: "all 0.18s", cursor: "pointer",
+        background: lida ? C.surface2 : `${C.surface2}`,
+        borderRadius: "0.75rem",
+        border: `1px solid ${lida ? C.border : "rgba(212,168,83,0.2)"}`,
+        transition: "all 0.18s", cursor: "default", position: "relative",
       }}
       onMouseEnter={e => {
         (e.currentTarget as HTMLElement).style.borderColor = C.borderHov;
         (e.currentTarget as HTMLElement).style.transform   = "translateX(4px)";
       }}
       onMouseLeave={e => {
-        (e.currentTarget as HTMLElement).style.borderColor = C.border;
+        (e.currentTarget as HTMLElement).style.borderColor = lida ? C.border : "rgba(212,168,83,0.2)";
         (e.currentTarget as HTMLElement).style.transform   = "translateX(0)";
       }}
     >
-      <div style={{
-        width: 34, height: 34, borderRadius: "0.625rem", flexShrink: 0,
-        background: C.goldFaint, border: `1px solid ${C.border}`,
-        display: "flex", alignItems: "center", justifyContent: "center",
-      }}>
+      {/* ponto não-lida */}
+      {!lida && (
+        <div style={{ position: "absolute", left: -6, top: "50%", transform: "translateY(-50%)", width: 6, height: 6, borderRadius: "50%", background: C.gold, boxShadow: `0 0 6px ${C.gold}88` }} />
+      )}
+
+      <div style={{ width: 34, height: 34, borderRadius: "0.625rem", flexShrink: 0, background: C.goldFaint, border: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
         {icon}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{ margin: 0, fontSize: "0.85rem", fontWeight: 600, color: C.text }}>{title}</p>
-        <p style={{ margin: "0.125rem 0 0", fontSize: "0.78rem", color: C.textDim }}>{description}</p>
+        <p style={{ margin: 0, fontSize: "0.85rem", fontWeight: lida ? 500 : 700, color: lida ? C.textDim : C.text }}>{title}</p>
+        {description && (
+          <p style={{ margin: "0.125rem 0 0", fontSize: "0.78rem", color: C.textDim, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{description}</p>
+        )}
       </div>
       <div style={{ fontSize: "0.72rem", color: C.textMuted, whiteSpace: "nowrap", paddingTop: "0.125rem" }}>
         {time}
