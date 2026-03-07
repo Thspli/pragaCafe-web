@@ -41,17 +41,17 @@ export function Header({
     marcarComoLida, marcarTodasComoLidas, deletarNotificacao, limparTodas,
   } = useNotificacoes();
 
-  const [userPanelOpen,   setUserPanelOpen]   = useState(false);
-  const [notifPanelOpen,  setNotifPanelOpen]  = useState(false);
+  const [userPanelOpen, setUserPanelOpen] = useState(false);
+  const [notifPanelOpen, setNotifPanelOpen] = useState(false);
   const [perfilModalOpen, setPerfilModalOpen] = useState(false);
   const [configModalOpen, setConfigModalOpen] = useState(false);
 
-  const userRef  = useRef<HTMLDivElement>(null);
+  const userRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
-      if (userRef.current  && !userRef.current.contains(e.target as Node))  setUserPanelOpen(false);
+      if (userRef.current && !userRef.current.contains(e.target as Node)) setUserPanelOpen(false);
       if (notifRef.current && !notifRef.current.contains(e.target as Node)) setNotifPanelOpen(false);
     }
     document.addEventListener("mousedown", onClickOutside);
@@ -106,10 +106,10 @@ export function Header({
 
           {/* ── STATS ── */}
           <div style={{ display: "flex", gap: "0.625rem", alignItems: "center", flex: 1, justifyContent: "center", flexWrap: "wrap" }}>
-            <StatPill icon={<MapPin size={16} />}  label="Talhões"     value={totals.totalTalhoes}                onClick={onListaTalhoes}    delay={0.05} />
-            <StatPill icon={<Camera size={16} />}  label="Pontos Foto" value={totals.totalArmadilhas}             onClick={onListaArmadilhas} delay={0.1}  />
-            <StatPill icon={<Coffee size={16} />}  label="Brocas"      value={totals.totalPragas} accent="#ef4444" delay={0.15} />
-            <StatPill icon={<Leaf size={16} />}    label="Área"        value={`${totals.areaTotal.toFixed(1)}ha`} delay={0.2} />
+            <StatPill icon={<MapPin size={16} />} label="Talhões" value={totals.totalTalhoes} onClick={onListaTalhoes} delay={0.05} />
+            <StatPill icon={<Camera size={16} />} label="Pontos Foto" value={totals.totalArmadilhas} onClick={onListaArmadilhas} delay={0.1} />
+            <StatPill icon={<Coffee size={16} />} label="Brocas" value={totals.totalPragas} accent="#ef4444" delay={0.15} />
+            <StatPill icon={<Leaf size={16} />} label="Área" value={`${totals.areaTotal.toFixed(1)}ha`} delay={0.2} />
           </div>
 
           {/* ── RIGHT ACTIONS ── */}
@@ -306,7 +306,11 @@ export function Header({
               <div style={{ padding: "1.25rem 1rem 2rem", borderTop: "1px solid rgba(212,168,83,0.12)" }}>
                 <motion.button
                   whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-                  onClick={logout}
+                  onClick={async () => {
+                    setUserPanelOpen(false);
+                    await logout();
+                    router.push("/login");
+                  }}
                   style={{
                     width: "100%", display: "flex", alignItems: "center", gap: "0.875rem",
                     padding: "1rem 1.125rem",
@@ -347,23 +351,23 @@ export function Header({
 // ─────────────────────────────────────────────────────────────────
 
 const TIPO_CONFIG: Record<string, { icon: React.ReactNode; color: string; bg: string }> = {
-  foto_tirada:         { icon: <Camera size={14} />,       color: "#C8860A", bg: "rgba(200,134,10,0.15)"  },
-  ponto_criado:        { icon: <MapPin size={14} />,        color: "#8B4513", bg: "rgba(139,69,19,0.15)"  },
-  ponto_atualizado:    { icon: <CheckCircle size={14} />,   color: "#3b82f6", bg: "rgba(59,130,246,0.15)" },
-  ponto_removido:      { icon: <X size={14} />,             color: "#ef4444", bg: "rgba(239,68,68,0.15)"  },
+  foto_tirada: { icon: <Camera size={14} />, color: "#C8860A", bg: "rgba(200,134,10,0.15)" },
+  ponto_criado: { icon: <MapPin size={14} />, color: "#8B4513", bg: "rgba(139,69,19,0.15)" },
+  ponto_atualizado: { icon: <CheckCircle size={14} />, color: "#3b82f6", bg: "rgba(59,130,246,0.15)" },
+  ponto_removido: { icon: <X size={14} />, color: "#ef4444", bg: "rgba(239,68,68,0.15)" },
   ausencia_registrada: { icon: <AlertTriangle size={14} />, color: "#f59e0b", bg: "rgba(245,158,11,0.15)" },
-  infestacao_alta:     { icon: <AlertTriangle size={14} />, color: "#ef4444", bg: "rgba(239,68,68,0.15)"  },
-  talhao_criado:       { icon: <MapPin size={14} />,        color: "#D4A853", bg: "rgba(212,168,83,0.15)" },
-  sistema:             { icon: <CheckCircle size={14} />,   color: "#6b7280", bg: "rgba(107,114,128,0.15)"},
+  infestacao_alta: { icon: <AlertTriangle size={14} />, color: "#ef4444", bg: "rgba(239,68,68,0.15)" },
+  talhao_criado: { icon: <MapPin size={14} />, color: "#D4A853", bg: "rgba(212,168,83,0.15)" },
+  sistema: { icon: <CheckCircle size={14} />, color: "#6b7280", bg: "rgba(107,114,128,0.15)" },
 };
 
 function timeAgo(dateStr: string) {
   const diff = Date.now() - new Date(dateStr).getTime();
-  const min  = Math.floor(diff / 60000);
-  if (min < 1)  return "agora";
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return "agora";
   if (min < 60) return `${min}min atrás`;
   const h = Math.floor(min / 60);
-  if (h < 24)   return `${h}h atrás`;
+  if (h < 24) return `${h}h atrás`;
   return `${Math.floor(h / 24)}d atrás`;
 }
 
@@ -569,11 +573,11 @@ function NotifDropdown({
 // MODAL PERFIL
 // ─────────────────────────────────────────────────────────────────
 function PerfilModal({ user, initials, onClose }: { user: any; initials: string; onClose: () => void }) {
-  const [editing, setEditing]         = useState(false);
-  const [nome, setNome]               = useState(user.nome || "");
-  const [telefone, setTelefone]       = useState(user.telefone || "");
-  const [fazenda, setFazenda]         = useState(user.fazenda || "");
-  const [saving, setSaving]           = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [nome, setNome] = useState(user.nome || "");
+  const [telefone, setTelefone] = useState(user.telefone || "");
+  const [fazenda, setFazenda] = useState(user.fazenda || "");
+  const [saving, setSaving] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
 
   const handleSave = async () => {
@@ -695,9 +699,9 @@ function PerfilModal({ user, initials, onClose }: { user: any; initials: string;
 // ─────────────────────────────────────────────────────────────────
 function ConfigModal({ onClose }: { onClose: () => void }) {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [darkMap, setDarkMap]   = useState(true);
+  const [darkMap, setDarkMap] = useState(true);
   const [language, setLanguage] = useState("pt-BR");
-  const [saved, setSaved]       = useState(false);
+  const [saved, setSaved] = useState(false);
 
   const handleSave = async () => {
     setSaved(true);

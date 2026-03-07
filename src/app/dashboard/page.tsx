@@ -1,7 +1,7 @@
 // src/app/dashboard/page.tsx
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   TrendingUp, TrendingDown, Coffee, Camera, MapPin,
@@ -36,7 +36,7 @@ const C = {
 };
 
 // ── Tooltip customizado ───────────────────────────────────────────
-const DarkTooltip = ({ active, payload, label }: any) => {
+const DarkTooltip = ({ active, payload, label, formatter }: any) => {
   if (!active || !payload?.length) return null;
   return (
     <div style={{
@@ -45,13 +45,16 @@ const DarkTooltip = ({ active, payload, label }: any) => {
       boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
     }}>
       <div style={{ fontSize: "0.75rem", color: C.goldDim, marginBottom: "0.4rem", fontWeight: 600 }}>{label}</div>
-      {payload.map((p: any) => (
-        <div key={p.name} style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.82rem", color: C.text }}>
-          <div style={{ width: 8, height: 8, borderRadius: "50%", background: p.color }} />
-          <span style={{ color: C.textDim }}>{p.name}:</span>
-          <span style={{ fontWeight: 700 }}>{p.value}</span>
-        </div>
-      ))}
+      {payload.map((p: any) => {
+        const displayValue = formatter ? formatter(p.value, p.name) : p.value;
+        return (
+          <div key={p.name} style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.82rem", color: C.text }}>
+            <div style={{ width: 8, height: 8, borderRadius: "50%", background: p.color }} />
+            <span style={{ color: C.textDim }}>{p.name}:</span>
+            <span style={{ fontWeight: 700 }}>{displayValue}</span>
+          </div>
+        );
+      })}
     </div>
   );
 };
@@ -80,10 +83,58 @@ function timeAgo(dateStr: string) {
   return `${Math.floor(h / 24)}d atrás`;
 }
 
+// ── Hook para buscar contagem REAL de armadilhas ──────────────────
+function useRealArmadilhaCount(talhaoIds: number[]) {
+  const [totalReal, setTotalReal] = useState<number | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!talhaoIds.length) {
+      setTotalReal(0);
+      return;
+    }
+
+    const fetchTotal = async () => {
+      setLoading(true);
+      try {
+        const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3333";
+        const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
+
+        let total = 0;
+        for (const id of talhaoIds) {
+          const params = new URLSearchParams({ talhaoId: String(id) });
+          const res = await fetch(`${API_URL}/armadilhas?${params.toString()}`, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+          });
+          if (!res.ok) continue;
+          const items = await res.json();
+          // deduplicar e filtrar sem coordenadas (igual à page.tsx)
+          const unique = Array.from(new Map(items.map((a: any) => [a.id, a])).values());
+          const validos = (unique as any[]).filter((a: any) => a.latitude != null && a.longitude != null);
+          total += validos.length;
+        }
+        setTotalReal(total);
+      } catch {
+        setTotalReal(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTotal();
+  }, [talhaoIds.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return { totalReal, loading };
+}
+
 export default function DashboardPage() {
   const { talhoes, loading }                      = useTalhoes();
   const { notificacoes, loading: notifLoading }   = useNotificacoes();
   const [selectedPeriod, setSelectedPeriod]       = useState<"week" | "month" | "year">("month");
+
+  // IDs dos talhões para o hook de contagem real
+  const talhaoIds = talhoes.map(t => t.id);
+  const { totalReal: totalArmadilhasReal, loading: armadilhasLoading } = useRealArmadilhaCount(talhaoIds);
 
   const pragasHistorico = [
     { mes: "Jan", brocas: 120, pontos: 45 },
@@ -102,14 +153,17 @@ export default function DashboardPage() {
   ].filter(d => d.value > 0);
 
   const talhoesPorBrocas = talhoes
-    .map(t => ({ nome: t.nome, brocas: t.totalPragas || 0, area: t.area || 0 }))
+    .map(t => ({ nome: t.nome, brocas: t.totalPragas || 0, area: parseFloat((t.area || 0).toFixed(1)) }))
     .sort((a, b) => b.brocas - a.brocas)
     .slice(0, 5);
 
   const totals = {
     totalTalhoes:    talhoes.length,
     totalPragas:     talhoes.reduce((acc, t) => acc + (t.totalPragas      || 0), 0),
-    totalArmadilhas: talhoes.reduce((acc, t) => acc + (t.armadilhasAtivas || 0), 0),
+    // usa contagem real se disponível, senão fallback para o campo do banco
+    totalArmadilhas: totalArmadilhasReal !== null
+      ? totalArmadilhasReal
+      : talhoes.reduce((acc, t) => acc + (t.armadilhasAtivas || 0), 0),
     areaTotal:       talhoes.reduce((acc, t) => acc + (t.area              || 0), 0),
   };
 
@@ -190,8 +244,15 @@ export default function DashboardPage() {
       {/* ── KPI CARDS ── */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "1rem", marginBottom: "1.75rem" }}>
         <KPICard icon={<MapPin size={22} />}   label="Total de Talhões" value={totals.totalTalhoes}                 trend={null} accent={C.blue}    delay={0}    />
-        <KPICard icon={<Coffee size={22} />}   label="Total de Brocas"  value={totals.totalPragas}                  trend={-12}  accent={C.red}     delay={0.07} />
-        <KPICard icon={<Camera size={22} />}   label="Pontos de Foto"   value={totals.totalArmadilhas}              trend={+8}   accent={C.brown}   delay={0.14} />
+        <KPICard
+          icon={<Camera size={22} />}
+          label="Pontos de Foto"
+          value={armadilhasLoading && totalArmadilhasReal === null ? "…" : totals.totalArmadilhas}
+          trend={+8}
+          accent={C.brown}
+          delay={0.07}
+        />
+        <KPICard icon={<Coffee size={22} />}   label="Total de Brocas"  value={totals.totalPragas}                  trend={-12}  accent={C.red}     delay={0.14} />
         <KPICard icon={<Activity size={22} />} label="Área Total"       value={`${totals.areaTotal.toFixed(1)} ha`} trend={null} accent={C.caramel} delay={0.21} />
       </div>
 
@@ -249,8 +310,8 @@ export default function DashboardPage() {
           <BarChart data={talhoesPorBrocas}>
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(212,168,83,0.08)" />
             <XAxis dataKey="nome" stroke={C.textDim} tick={{ fontSize: 11, fill: C.textDim }} />
-            <YAxis stroke={C.textDim} tick={{ fontSize: 11, fill: C.textDim }} />
-            <Tooltip content={<DarkTooltip />} />
+            <YAxis stroke={C.textDim} tick={{ fontSize: 11, fill: C.textDim }} tickFormatter={(v) => Number.isInteger(v) ? v : v.toFixed(1)} />
+            <Tooltip content={<DarkTooltip formatter={(value: any, name: string) => name === "Área (ha)" ? `${Number(value).toFixed(1)} ha` : value} />} />
             <Legend wrapperStyle={{ fontSize: "0.78rem", color: C.textDim }} />
             <Bar dataKey="brocas" fill={C.red}   name="Brocas"    radius={[6, 6, 0, 0]} />
             <Bar dataKey="area"   fill={C.brown} name="Área (ha)" radius={[6, 6, 0, 0]} />
@@ -379,7 +440,6 @@ function NotifActivityItem({ icon, title, description, time, lida }: {
         (e.currentTarget as HTMLElement).style.transform   = "translateX(0)";
       }}
     >
-      {/* ponto não-lida */}
       {!lida && (
         <div style={{ position: "absolute", left: -6, top: "50%", transform: "translateY(-50%)", width: 6, height: 6, borderRadius: "50%", background: C.gold, boxShadow: `0 0 6px ${C.gold}88` }} />
       )}
