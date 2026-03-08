@@ -108,7 +108,6 @@ function useRealArmadilhaCount(talhaoIds: number[]) {
           });
           if (!res.ok) continue;
           const items = await res.json();
-          // deduplicar e filtrar sem coordenadas (igual à page.tsx)
           const unique = Array.from(new Map(items.map((a: any) => [a.id, a])).values());
           const validos = (unique as any[]).filter((a: any) => a.latitude != null && a.longitude != null);
           total += validos.length;
@@ -132,7 +131,6 @@ export default function DashboardPage() {
   const { notificacoes, loading: notifLoading }   = useNotificacoes();
   const [selectedPeriod, setSelectedPeriod]       = useState<"week" | "month" | "year">("month");
 
-  // IDs dos talhões para o hook de contagem real
   const talhaoIds = talhoes.map(t => t.id);
   const { totalReal: totalArmadilhasReal, loading: armadilhasLoading } = useRealArmadilhaCount(talhaoIds);
 
@@ -160,14 +158,12 @@ export default function DashboardPage() {
   const totals = {
     totalTalhoes:    talhoes.length,
     totalPragas:     talhoes.reduce((acc, t) => acc + (t.totalPragas      || 0), 0),
-    // usa contagem real se disponível, senão fallback para o campo do banco
     totalArmadilhas: totalArmadilhasReal !== null
       ? totalArmadilhasReal
       : talhoes.reduce((acc, t) => acc + (t.armadilhasAtivas || 0), 0),
     areaTotal:       talhoes.reduce((acc, t) => acc + (t.area              || 0), 0),
   };
 
-  // pega as 5 notificações mais recentes para "Atividades Recentes"
   const atividadesRecentes = notificacoes.slice(0, 5);
 
   if (loading) {
@@ -286,9 +282,16 @@ export default function DashboardPage() {
         <ChartCard title="Status dos Talhões" subtitle="Distribuição atual" icon={<PieChartIcon size={18} />}>
           <ResponsiveContainer width="100%" height={260}>
             <PieChart>
-              <Pie data={statusDistribution} cx="50%" cy="50%" labelLine={false}
-               label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
-                outerRadius={95} dataKey="value">
+              <Pie
+                data={statusDistribution}
+                cx="50%" cy="50%"
+                labelLine={false}
+                label={({ name, percent }: { name: string; percent?: number }) =>
+                  `${name} ${((percent ?? 0) * 100).toFixed(0)}%`
+                }
+                outerRadius={95}
+                dataKey="value"
+              >
                 {statusDistribution.map((entry, i) => (
                   <Cell key={i} fill={entry.color} stroke="rgba(0,0,0,0.3)" strokeWidth={2} />
                 ))}
@@ -319,7 +322,7 @@ export default function DashboardPage() {
         </ResponsiveContainer>
       </ChartCard>
 
-      {/* ── ATIVIDADES RECENTES (notificações reais) ── */}
+      {/* ── ATIVIDADES RECENTES ── */}
       <motion.div
         initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}
         style={{ background: C.surface, borderRadius: "1rem", padding: "1.5rem", border: `1px solid ${C.border}` }}
@@ -347,7 +350,10 @@ export default function DashboardPage() {
               return (
                 <NotifActivityItem
                   key={n.id}
-                  icon={React.cloneElement(icon as React.ReactElement, { style: { color } })}
+                  icon={React.cloneElement(
+                    icon as React.ReactElement<{ style?: React.CSSProperties }>,
+                    { style: { color } }
+                  )}
                   title={n.titulo}
                   description={
                     [n.mensagem, n.metadados?.talhaoNome ? `Talhão: ${n.metadados.talhaoNome}` : null]
@@ -426,7 +432,7 @@ function NotifActivityItem({ icon, title, description, time, lida }: {
     <div
       style={{
         display: "flex", gap: "0.875rem", padding: "0.875rem 1rem",
-        background: lida ? C.surface2 : `${C.surface2}`,
+        background: C.surface2,
         borderRadius: "0.75rem",
         border: `1px solid ${lida ? C.border : "rgba(212,168,83,0.2)"}`,
         transition: "all 0.18s", cursor: "default", position: "relative",
@@ -443,7 +449,6 @@ function NotifActivityItem({ icon, title, description, time, lida }: {
       {!lida && (
         <div style={{ position: "absolute", left: -6, top: "50%", transform: "translateY(-50%)", width: 6, height: 6, borderRadius: "50%", background: C.gold, boxShadow: `0 0 6px ${C.gold}88` }} />
       )}
-
       <div style={{ width: 34, height: 34, borderRadius: "0.625rem", flexShrink: 0, background: C.goldFaint, border: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
         {icon}
       </div>
