@@ -19,6 +19,244 @@ interface TalhaoMapProps {
   onArmadilhaClick?: (armadilha: any) => void;
 }
 
+interface NominatimResult {
+  place_id: number;
+  display_name: string;
+  lat: string;
+  lon: string;
+  type: string;
+}
+
+// ── Barra de busca de localização ────────────────────────────────
+function SearchBar({ onSelectLocation }: { onSelectLocation: (lat: number, lng: number, label: string) => void }) {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<NominatimResult[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const search = useCallback(async (q: string) => {
+    if (q.trim().length < 3) { setResults([]); setOpen(false); return; }
+    setLoading(true);
+
+    // Adiciona "Brasil" se a query não parecer já ter país/estado
+    const queryBR = /brasil|brazil|\bsp\b|\bmg\b|\bpr\b|\bms\b|\bgo\b|\bmt\b/i.test(q) ? q : `${q}, Brasil`;
+
+    try {
+      // Roda Nominatim e Photon em paralelo
+      const [nominatimRes, photonRes] = await Promise.allSettled([
+        fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(queryBR)}&limit=8&addressdetails=1&countrycodes=br`,
+          { headers: { "Accept-Language": "pt-BR,pt;q=0.9" } }
+        ).then(r => r.json()),
+        fetch(
+          `https://photon.komoot.io/api/?q=${encodeURIComponent(queryBR)}&limit=8&lang=pt&bbox=-73.99,-33.75,-28.85,5.27`
+        ).then(r => r.json()),
+      ]);
+
+      const nominatimData: NominatimResult[] =
+        nominatimRes.status === "fulfilled" ? nominatimRes.value : [];
+
+      // Converte resultados do Photon para o mesmo formato do Nominatim
+      const photonData: NominatimResult[] =
+        photonRes.status === "fulfilled"
+          ? (photonRes.value?.features ?? [])
+              .filter((f: any) => {
+                const country = f.properties?.country ?? "";
+                return country === "Brasil" || country === "Brazil" || country === "";
+              })
+              .map((f: any, i: number) => {
+                const p = f.properties ?? {};
+                const parts = [p.name, p.street, p.city || p.town || p.village, p.state, "Brasil"]
+                  .filter(Boolean);
+                return {
+                  place_id: 900000 + i,
+                  display_name: parts.join(", "),
+                  lat: String(f.geometry?.coordinates?.[1] ?? 0),
+                  lon: String(f.geometry?.coordinates?.[0] ?? 0),
+                  type: p.osm_value ?? p.type ?? "place",
+                };
+              })
+          : [];
+
+      // Merge: Nominatim primeiro, depois Photon sem duplicatas de display_name
+      const seen = new Set<string>();
+      const merged: NominatimResult[] = [];
+      for (const r of [...nominatimData, ...photonData]) {
+        const key = r.display_name.toLowerCase().slice(0, 40);
+        if (!seen.has(key)) { seen.add(key); merged.push(r); }
+        if (merged.length >= 7) break;
+      }
+
+      setResults(merged);
+      setOpen(merged.length > 0);
+    } catch {
+      setResults([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setQuery(val);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => search(val), 500);
+  };
+
+  const handleSelect = (result: NominatimResult) => {
+    setQuery(result.display_name.split(",").slice(0, 2).join(","));
+    setOpen(false);
+    onSelectLocation(parseFloat(result.lat), parseFloat(result.lon), result.display_name);
+  };
+
+  const handleClear = () => { setQuery(""); setResults([]); setOpen(false); };
+
+  const getPlaceEmoji = (type: string) => {
+    if (["city", "town", "village", "municipality"].includes(type)) return "🏙️";
+    if (["farm", "farmyard", "farmland"].includes(type)) return "🌾";
+    if (["state", "region", "province"].includes(type)) return "🗺️";
+    if (["country"].includes(type)) return "🌎";
+    if (["road", "street"].includes(type)) return "🛣️";
+    return "📍";
+  };
+
+  return (
+    <div
+      ref={wrapperRef}
+      style={{
+        position: "absolute",
+        top: "1rem",
+        left: "50%",
+        transform: "translateX(-50%)",
+        zIndex: 1000,
+        width: "min(420px, calc(100vw - 2rem))",
+      }}
+    >
+      <div style={{
+        display: "flex", alignItems: "center", gap: "0.5rem",
+        background: "rgba(26, 15, 10, 0.92)",
+        backdropFilter: "blur(16px)",
+        WebkitBackdropFilter: "blur(16px)",
+        border: `1px solid ${focused ? "rgba(212,168,83,0.5)" : "rgba(212,168,83,0.25)"}`,
+        borderRadius: open && results.length > 0 ? "0.875rem 0.875rem 0 0" : "0.875rem",
+        padding: "0.625rem 1rem",
+        boxShadow: "0 8px 32px rgba(0,0,0,0.45)",
+        transition: "border-color 0.2s",
+        position: "relative",
+      }}>
+        <span style={{ fontSize: "1rem", flexShrink: 0, opacity: loading ? 0 : 1, transition: "opacity 0.2s" }}>🔍</span>
+        {loading && (
+          <div style={{
+            position: "absolute", left: "1rem",
+            width: 16, height: 16, borderRadius: "50%",
+            border: "2px solid rgba(212,168,83,0.2)",
+            borderTop: "2px solid #D4A853",
+            animation: "spin 0.8s linear infinite",
+          }} />
+        )}
+        <input
+          type="text"
+          value={query}
+          onChange={handleChange}
+          onFocus={() => { setFocused(true); if (results.length > 0) setOpen(true); }}
+          onBlur={() => setFocused(false)}
+          placeholder="Buscar cidade, fazenda, endereço…"
+          style={{
+            flex: 1, background: "transparent", border: "none", outline: "none",
+            color: "rgba(255,255,255,0.9)", fontSize: "0.9rem", fontWeight: 500,
+            fontFamily: "inherit",
+          }}
+        />
+        {query && (
+          <button
+            onClick={handleClear}
+            style={{
+              background: "rgba(255,255,255,0.08)", border: "none", cursor: "pointer",
+              color: "rgba(255,255,255,0.5)", width: 22, height: 22, borderRadius: "50%",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: "0.75rem", flexShrink: 0, transition: "all 0.15s",
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.15)"; e.currentTarget.style.color = "#fff"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.08)"; e.currentTarget.style.color = "rgba(255,255,255,0.5)"; }}
+          >✕</button>
+        )}
+      </div>
+
+      {open && results.length > 0 && (
+        <div style={{
+          background: "rgba(26, 15, 10, 0.97)",
+          backdropFilter: "blur(16px)",
+          border: "1px solid rgba(212,168,83,0.25)",
+          borderTop: "1px solid rgba(212,168,83,0.1)",
+          borderRadius: "0 0 0.875rem 0.875rem",
+          overflow: "hidden",
+          boxShadow: "0 12px 32px rgba(0,0,0,0.5)",
+        }}>
+          {results.map((r, i) => (
+            <button
+              key={r.place_id}
+              onClick={() => handleSelect(r)}
+              style={{
+                width: "100%", display: "flex", alignItems: "flex-start", gap: "0.75rem",
+                padding: "0.75rem 1rem",
+                background: "transparent", border: "none",
+                borderTop: i > 0 ? "1px solid rgba(212,168,83,0.08)" : "none",
+                cursor: "pointer", textAlign: "left", transition: "background 0.15s",
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = "rgba(212,168,83,0.1)"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
+            >
+              <span style={{ fontSize: "1.1rem", flexShrink: 0, marginTop: 1 }}>{getPlaceEmoji(r.type)}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "rgba(255,255,255,0.9)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {r.display_name.split(",")[0]}
+                </div>
+                <div style={{ fontSize: "0.72rem", color: "rgba(212,168,83,0.55)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginTop: 2 }}>
+                  {r.display_name.split(",").slice(1, 4).join(",")}
+                </div>
+              </div>
+            </button>
+          ))}
+          <div style={{ padding: "0.4rem 1rem", borderTop: "1px solid rgba(212,168,83,0.08)" }}>
+            <span style={{ fontSize: "0.65rem", color: "rgba(212,168,83,0.3)" }}>Dados © OpenStreetMap contributors</span>
+          </div>
+        </div>
+      )}
+
+      {open && results.length === 0 && !loading && query.trim().length >= 3 && (
+        <div style={{
+          background: "rgba(26, 15, 10, 0.97)",
+          backdropFilter: "blur(16px)",
+          border: "1px solid rgba(212,168,83,0.25)",
+          borderTop: "1px solid rgba(212,168,83,0.1)",
+          borderRadius: "0 0 0.875rem 0.875rem",
+          padding: "1.25rem 1rem", textAlign: "center",
+          boxShadow: "0 12px 32px rgba(0,0,0,0.5)",
+        }}>
+          <span style={{ fontSize: "1.5rem", display: "block", marginBottom: "0.375rem" }}>🔍</span>
+          <span style={{ fontSize: "0.82rem", color: "rgba(212,168,83,0.5)", fontWeight: 500 }}>
+            Nenhum resultado para "{query}"
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Componente principal ──────────────────────────────────────────
 export function TalhaoMap({
   talhoes,
   onPolygonCreated,
@@ -39,7 +277,36 @@ export function TalhaoMap({
   };
   const armadilhaLayersRef = useRef<Map<number, any[]>>(new Map());
   const [armadilhaCountsByTalhao, setArmadilhaCountsByTalhao] = useState<Map<number, number>>(new Map());
+  const searchMarkerRef = useRef<any>(null);
   const toast = useToast();
+
+  const handleSelectLocation = useCallback((lat: number, lng: number, label: string) => {
+    if (!mapInstanceRef.current) return;
+    const L = (window as any).L;
+    const { map } = mapInstanceRef.current;
+
+    if (searchMarkerRef.current) {
+      try { map.removeLayer(searchMarkerRef.current); } catch {}
+      searchMarkerRef.current = null;
+    }
+
+    map.flyTo([lat, lng], 14, { animate: true, duration: 1.2 });
+
+    const pinHtml = `
+      <div style="display:flex;flex-direction:column;align-items:center;">
+        <div style="background:linear-gradient(135deg,#2C1810,#8B4513);border:2px solid #D4A853;border-radius:50% 50% 50% 0;width:32px;height:32px;transform:rotate(-45deg);box-shadow:0 4px 12px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;">
+          <span style="transform:rotate(45deg);font-size:14px;">📍</span>
+        </div>
+        <div style="background:rgba(26,15,10,0.92);border:1px solid rgba(212,168,83,0.4);border-radius:0.5rem;padding:4px 8px;margin-top:4px;font-size:11px;font-weight:600;color:rgba(255,255,255,0.9);white-space:nowrap;max-width:200px;overflow:hidden;text-overflow:ellipsis;box-shadow:0 4px 12px rgba(0,0,0,0.3);text-align:center;">
+          ${label.split(",").slice(0, 2).join(",")}
+        </div>
+      </div>`;
+
+    const icon = L.divIcon({ html: pinHtml, className: "", iconSize: [32, 72], iconAnchor: [16, 36] });
+    const marker = L.marker([lat, lng], { icon }).addTo(map);
+    setTimeout(() => { try { map.removeLayer(marker); } catch {} }, 8000);
+    searchMarkerRef.current = marker;
+  }, []);
 
   // 1. Carrega scripts Leaflet
   useEffect(() => {
@@ -98,7 +365,6 @@ export function TalhaoMap({
   useEffect(() => {
     if (!scriptsLoaded || !mapContainerRef.current || mapInstanceRef.current) return;
     const L = (window as any).L;
-
     const defaultCenter: [number, number] = [-22.028, -50.044];
 
     const initMap = (center: [number, number], zoom: number) => {
@@ -309,7 +575,6 @@ export function TalhaoMap({
     })();
   }, [mapInitialized, talhoes, onTalhaoClick, fetchAndRenderArmadilhasForTalhao]);
 
-  // Event listener mudanças armadilhas
   useEffect(() => {
     const onArmadilhaChanged = async (ev: any) => {
       const detail = ev?.detail;
@@ -351,124 +616,74 @@ export function TalhaoMap({
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", height: "100%", position: "relative" }}>
 
-      {/* ── TOOLBAR FLUTUANTE ─────────────────────────────── */}
+      {/* ── BARRA DE BUSCA ── */}
+      {mapInitialized && (
+        <SearchBar onSelectLocation={handleSelectLocation} />
+      )}
+
+      {/* ── TOOLBAR FLUTUANTE ── */}
       <div style={{
-        position: "absolute",
-        bottom: "1.5rem",
-        left: "50%",
-        transform: "translateX(-50%)",
-        zIndex: 1000,
-        display: "flex",
-        alignItems: "center",
-        gap: "0.75rem",
-        background: "rgba(26, 15, 10, 0.88)",
-        backdropFilter: "blur(16px)",
-        WebkitBackdropFilter: "blur(16px)",
-        border: "1px solid rgba(212,168,83,0.25)",
-        borderRadius: "9999px",
-        padding: "0.75rem 1.125rem",
+        position: "absolute", bottom: "1.5rem", left: "50%", transform: "translateX(-50%)",
+        zIndex: 1000, display: "flex", alignItems: "center", gap: "0.75rem",
+        background: "rgba(26, 15, 10, 0.88)", backdropFilter: "blur(16px)",
+        WebkitBackdropFilter: "blur(16px)", border: "1px solid rgba(212,168,83,0.25)",
+        borderRadius: "9999px", padding: "0.75rem 1.125rem",
         boxShadow: "0 8px 32px rgba(0,0,0,0.45), 0 0 0 1px rgba(212,168,83,0.08) inset",
       }}>
-
-        {/* Status indicator */}
         {mapInitialized && (
           <div style={{
             display: "flex", alignItems: "center", gap: "0.4rem",
-            paddingRight: "0.625rem",
-            borderRight: "1px solid rgba(212,168,83,0.2)",
-            marginRight: "0.125rem",
+            paddingRight: "0.625rem", borderRight: "1px solid rgba(212,168,83,0.2)", marginRight: "0.125rem",
           }}>
-            <div style={{
-              width: 7, height: 7, borderRadius: "50%",
-              background: "#22c55e",
-              boxShadow: "0 0 6px #22c55e",
-            }} />
+            <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 6px #22c55e" }} />
             <span style={{ fontSize: "0.82rem", color: "rgba(212,168,83,0.8)", fontWeight: 600, letterSpacing: "0.04em" }}>
               {talhoes.length} {talhoes.length === 1 ? "talhão" : "talhões"}
             </span>
           </div>
         )}
 
-        {/* Botão: Novo talhão */}
         <MapToolButton
-          active={drawing}
-          disabled={!mapInitialized}
+          active={drawing} disabled={!mapInitialized}
           onClick={() => setDrawing(d => !d)}
-          label={drawing ? "Cancelar" : "Novo Talhão"}
-          emoji={drawing ? "✕" : "✏️"}
-          activeColor="rgba(220,38,38,0.85)"
-          tooltip={drawing ? "Cancelar desenho" : "Desenhar novo talhão"}
+          label={drawing ? "Cancelar" : "Novo Talhão"} emoji={drawing ? "✕" : "✏️"}
+          activeColor="rgba(220,38,38,0.85)" tooltip={drawing ? "Cancelar desenho" : "Desenhar novo talhão"}
         />
-
         <div style={{ width: 1, height: 24, background: "rgba(212,168,83,0.15)" }} />
-
-        {/* Botão: Ponto de foto */}
         <MapToolButton
-          active={addingArmadilha}
-          disabled={!mapInitialized}
+          active={addingArmadilha} disabled={!mapInitialized}
           onClick={() => setAddingArmadilhaSync(!addingArmadilhaRef.current)}
-          label={addingArmadilha ? "Cancelar" : "Ponto de Foto"}
-          emoji={addingArmadilha ? "✕" : "📸"}
-          activeColor="rgba(220,38,38,0.85)"
-          tooltip={addingArmadilha ? "Cancelar" : "Adicionar ponto de foto"}
+          label={addingArmadilha ? "Cancelar" : "Ponto de Foto"} emoji={addingArmadilha ? "✕" : "📸"}
+          activeColor="rgba(220,38,38,0.85)" tooltip={addingArmadilha ? "Cancelar" : "Adicionar ponto de foto"}
         />
 
-        {/* Loading */}
         {!mapInitialized && (
           <>
             <div style={{ width: 1, height: 24, background: "rgba(212,168,83,0.15)" }} />
             <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", padding: "0 0.25rem" }}>
-              <div style={{
-                width: 14, height: 14,
-                border: "2px solid rgba(212,168,83,0.2)",
-                borderTop: "2px solid #D4A853",
-                borderRadius: "50%",
-                animation: "spin 0.8s linear infinite",
-              }} />
-              <span style={{ fontSize: "0.72rem", color: "rgba(212,168,83,0.6)", fontWeight: 500 }}>
-                Carregando…
-              </span>
+              <div style={{ width: 14, height: 14, border: "2px solid rgba(212,168,83,0.2)", borderTop: "2px solid #D4A853", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+              <span style={{ fontSize: "0.72rem", color: "rgba(212,168,83,0.6)", fontWeight: 500 }}>Carregando…</span>
             </div>
           </>
         )}
       </div>
 
-      {/* ── MAP CONTAINER ─────────────────────────────────── */}
-      <div
-        ref={mapContainerRef}
-        style={{ flex: 1, width: "100%", height: "100%", background: "#d4d4d4", position: "relative" }}
-      >
+      {/* ── MAP CONTAINER ── */}
+      <div ref={mapContainerRef} style={{ flex: 1, width: "100%", height: "100%", background: "#d4d4d4", position: "relative" }}>
         {!mapInitialized && (
           <div style={{
-            position: "absolute", top: "50%", left: "50%",
-            transform: "translate(-50%, -50%)", zIndex: 1000,
+            position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", zIndex: 1000,
             background: "rgba(26,15,10,0.92)", backdropFilter: "blur(12px)",
             padding: "1.75rem 2.25rem", borderRadius: "1rem",
-            border: "1px solid rgba(212,168,83,0.25)",
-            boxShadow: "0 16px 40px rgba(0,0,0,0.4)",
-            textAlign: "center",
+            border: "1px solid rgba(212,168,83,0.25)", boxShadow: "0 16px 40px rgba(0,0,0,0.4)", textAlign: "center",
           }}>
-            <div style={{
-              width: 40, height: 40,
-              border: "3px solid rgba(212,168,83,0.15)",
-              borderTop: "3px solid #D4A853",
-              borderRadius: "50%",
-              margin: "0 auto 1rem",
-              animation: "spin 1s linear infinite",
-            }} />
-            <p style={{ color: "#D4A853", fontWeight: 600, margin: 0, fontSize: "0.9rem" }}>
-              🛰️ Carregando mapa satélite…
-            </p>
-            <p style={{ color: "rgba(212,168,83,0.45)", fontWeight: 400, margin: "0.25rem 0 0", fontSize: "0.75rem" }}>
-              Aguarde um momento
-            </p>
+            <div style={{ width: 40, height: 40, border: "3px solid rgba(212,168,83,0.15)", borderTop: "3px solid #D4A853", borderRadius: "50%", margin: "0 auto 1rem", animation: "spin 1s linear infinite" }} />
+            <p style={{ color: "#D4A853", fontWeight: 600, margin: 0, fontSize: "0.9rem" }}>🛰️ Carregando mapa satélite…</p>
+            <p style={{ color: "rgba(212,168,83,0.45)", fontWeight: 400, margin: "0.25rem 0 0", fontSize: "0.75rem" }}>Aguarde um momento</p>
           </div>
         )}
       </div>
 
-      <style>{`
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-      `}</style>
+      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }
@@ -481,29 +696,19 @@ function MapToolButton({
   label: string; emoji: string; activeColor: string; tooltip: string;
 }) {
   const [hovered, setHovered] = useState(false);
-
   return (
     <button
-      onClick={onClick}
-      disabled={disabled}
-      title={tooltip}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      onClick={onClick} disabled={disabled} title={tooltip}
+      onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
       style={{
         display: "flex", alignItems: "center", gap: "0.4rem",
-        padding: "0.6rem 1.25rem",
-        borderRadius: "9999px",
-        border: active
-          ? `1px solid ${activeColor}`
-          : `1px solid ${hovered ? "rgba(212,168,83,0.4)" : "rgba(212,168,83,0.15)"}`,
-        background: active
-          ? activeColor
-          : hovered ? "rgba(212,168,83,0.12)" : "transparent",
+        padding: "0.6rem 1.25rem", borderRadius: "9999px",
+        border: active ? `1px solid ${activeColor}` : `1px solid ${hovered ? "rgba(212,168,83,0.4)" : "rgba(212,168,83,0.15)"}`,
+        background: active ? activeColor : hovered ? "rgba(212,168,83,0.12)" : "transparent",
         color: active ? "#fff" : hovered ? "#D4A853" : "rgba(255,255,255,0.75)",
         fontSize: "0.9rem", fontWeight: 600,
         cursor: disabled ? "not-allowed" : "pointer",
-        opacity: disabled ? 0.4 : 1,
-        transition: "all 0.18s ease",
+        opacity: disabled ? 0.4 : 1, transition: "all 0.18s ease",
         letterSpacing: "0.01em", whiteSpace: "nowrap",
       }}
     >
