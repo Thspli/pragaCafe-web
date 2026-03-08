@@ -287,7 +287,7 @@ export default function DashboardPage() {
           <ResponsiveContainer width="100%" height={260}>
             <PieChart>
               <Pie data={statusDistribution} cx="50%" cy="50%" labelLine={false}
-                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+               label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
                 outerRadius={95} dataKey="value">
                 {statusDistribution.map((entry, i) => (
                   <Cell key={i} fill={entry.color} stroke="rgba(0,0,0,0.3)" strokeWidth={2} />
